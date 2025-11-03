@@ -24,22 +24,22 @@ fun LobbyScreen(
             text = "Salle d'attente",
             style = MaterialTheme.typography.headlineMedium
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text("Code de la partie: $gameId")
-        
+
         Spacer(modifier = Modifier.height(48.dp))
-        
+
         Button(
             onClick = onNavigateToGame,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Commencer la partie")
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         OutlinedButton(
             onClick = onNavigateBack,
             modifier = Modifier.fillMaxWidth()
@@ -48,3 +48,4 @@ fun LobbyScreen(
         }
     }
 }
+

@@ -12,10 +12,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun HomeScreen(
     onNavigateToLobby: (String) -> Unit,
+    onNavigateToTestUI: () -> Unit = {},  // ← AJOUTÉ
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -28,9 +29,9 @@ fun HomeScreen(
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold
         )
-        
+
         Spacer(modifier = Modifier.height(48.dp))
-        
+
         // Créer une partie
         Button(
             onClick = { viewModel.createGame() },
@@ -48,9 +49,9 @@ fun HomeScreen(
                 Text("Créer une partie")
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Rejoindre une partie
         OutlinedTextField(
             value = uiState.gameIdInput,
@@ -59,9 +60,9 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Button(
             onClick = { viewModel.joinGame() },
             modifier = Modifier
@@ -71,7 +72,15 @@ fun HomeScreen(
         ) {
             Text("Rejoindre une partie")
         }
-        
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        OutlinedButton(
+            onClick = { onNavigateToTestUI() },  // ← Nouveau callback
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("🎨 Tester l'interface")
+        }
         // Afficher les erreurs
         uiState.error?.let { error ->
             Spacer(modifier = Modifier.height(16.dp))
@@ -81,7 +90,7 @@ fun HomeScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
-        
+
         // Naviguer vers le lobby quand un game ID est disponible
         LaunchedEffect(uiState.createdGameId) {
             uiState.createdGameId?.let { gameId ->

@@ -1,13 +1,19 @@
 package club.djipi.lebarcs.server.routes
 
 import club.djipi.lebarcs.server.service.GameManager
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.channels.consumeEach
 
 fun Route.gameRoutes(gameManager: GameManager) {
-    
+
+    // Route principale pour vérifier que le serveur est en ligne
+    get("/") {
+        call.respondText("Bonjour, le serveur LeBarCS est en ligne !")
+    }
+
     webSocket("/game/{gameId}") {
         val gameId = call.parameters["gameId"] ?: run {
             close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Game ID required"))

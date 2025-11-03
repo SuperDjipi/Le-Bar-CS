@@ -18,6 +18,7 @@ coroutines = "1.9.0"
 # Hilt
 hilt = "2.52"
 hiltNavigationCompose = "1.2.0"
+ksp = "2.0.21-1.0.28"
 # Navigation
 navigation = "2.8.4"
 # Serialization
@@ -31,6 +32,11 @@ espressoCore = "3.7.0"
 
 
 jetbrainsKotlinJvm = "2.0.21"
+kotlinStdlib = "2.0.21"
+kotlinTest = "2.0.21"
+runner = "1.7.0"
+core = "1.7.0"
+navigationSafeArgsGenerator = "2.9.5"
 
 [libraries]
 # AndroidX Core
@@ -90,6 +96,11 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlinStdlib" }
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlinTest" }
+androidx-runner = { group = "androidx.test", name = "runner", version.ref = "runner" }
+androidx-core = { group = "androidx.test", name = "core", version.ref = "core" }
+androidx-navigation-safe-args-generator = { group = "androidx.navigation", name = "navigation-safe-args-generator", version.ref = "navigationSafeArgsGenerator" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -98,12 +109,15 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
-ksp = { id = "com.google.devtools.ksp", version = "2.0.21-1.0.28" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrainsKotlinJvm" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+android-lint = { id = "com.android.lint", version.ref = "agp" }
 
 [bundles]
 compose = ["androidx-compose-ui", "androidx-compose-ui-graphics", "androidx-compose-ui-tooling-preview", "androidx-compose-material3"]
 ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-websockets", "ktor-server-content-negotiation", "ktor-serialization-kotlinx-json"]
 ktor-client = ["ktor-client-core", "ktor-client-android", "ktor-client-websockets", "ktor-client-content-negotiation", "ktor-client-logging", "ktor-serialization-kotlinx-json"]
-room = ["room-runtime", "room-ktx"]
+room = ["room-runtime", "room-ktx", "room-compiler"]

@@ -1,9 +1,10 @@
-package cclub.djipi.lebarcs.server.service
+package club.djipi.lebarcs.server.service
 
 import club.djipi.lebarcs.server.model.ServerGame
 import io.ktor.websocket.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -78,7 +79,7 @@ class GameManager {
         val session = playerSessions[gameId]?.get(playerId) ?: return
         
         val gameState = game.toGameStateDto()
-        val message = """{"type":"GAME_STATE","gameState":${json.encodeToString(gameState)}}"""
+        val message = """{"type":"GAME_STATE","gameState":${json.encodeToString(value = gameState)}}"""
         
         session.send(Frame.Text(message))
     }

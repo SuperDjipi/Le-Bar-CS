@@ -1,7 +1,10 @@
 package club.djipi.lebarcs.data.remote
 
-import club.djipi.lebarcs.data.remote.dto.GameStateDto
-import club.djipi.lebarcs.data.remote.dto.MessageDto
+import androidx.navigation.safe.args.generator.ErrorMessage
+import club.djipi.lebarcs.shared.dto.GameStateDto
+import club.djipi.lebarcs.shared.dto.GameStateUpdate
+import club.djipi.lebarcs.shared.dto.PlayerJoined
+import club.djipi.lebarcs.shared.dto.ServerEvent
 import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.websocket.*
@@ -53,20 +56,43 @@ class WebSocketClient @Inject constructor(
     
     private fun handleMessage(text: String) {
         try {
-            val message = json.decodeFromString<MessageDto>(text)
-            when (message.type) {
-                "GAME_STATE" -> {
-                    message.gameState?.let { _gameState.value = it }
+//            val message = json.decodeFromString<MessageDto>(text)
+//            when (message.type) {
+//                "GAME_STATE" -> {
+//                    message.gameState?.let { _gameState.value = it }
+//                }
+//                "PLAYER_JOINED" -> {
+//                    // Gérer l'arrivée d'un joueur
+//                }
+//                "MOVE_PLAYED" -> {
+//                    // Gérer un coup joué
+//                }
+//                "GAME_ENDED" -> {
+//                    // Gérer la fin de partie
+//                }
+//            }
+            // La magie opère ici : on décode directement dans la classe scellée
+            when (val event = json.decodeFromString<ServerEvent>(text)) {
+
+                is GameStateUpdate -> {
+                    // Le compilateur sait que 'event' est de type GameStateUpdate
+                    // 'event.gameState' est garanti non-null ici !
+                    _gameState.value = event.gameState
                 }
-                "PLAYER_JOINED" -> {
-                    // Gérer l'arrivée d'un joueur
+
+                is PlayerJoined -> {
+                    // Le compilateur sait que 'event.player' existe et n'est pas null
+                    println("Un joueur a rejoint : ${event.player.name}")
+                    // Mettez à jour votre UI ou votre état local ici
                 }
-                "MOVE_PLAYED" -> {
-                    // Gérer un coup joué
+
+                is ErrorMessage -> {
+                    // Le compilateur sait que 'event.message' existe
+                    println("Erreur du serveur : ${event.message}")
                 }
-                "GAME_ENDED" -> {
-                    // Gérer la fin de partie
-                }
+
+                // Ajoutez un 'is' pour chaque type d'événement
+                is club.djipi.lebarcs.shared.dto.ErrorMessage -> TODO()
             }
         } catch (e: Exception) {
             e.printStackTrace()

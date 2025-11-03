@@ -1,9 +1,9 @@
 package club.djipi.lebarcs.server.model
 
-import kotlinx.serialization.Serializable
-import java.util.UUID
+import club.djipi.lebarcs.shared.domain.model.Tile
+import club.djipi.lebarcs.shared.domain.model.Tile.Companion.value
+import club.djipi.lebarcs.shared.dto.*
 
-@Serializable
 data class ServerGame(
     val id: String,
     val hostPlayerId: String,
@@ -24,12 +24,11 @@ data class ServerGame(
     }
 }
 
-@Serializable
 data class ServerPlayer(
     val id: String,
     val name: String,
     val score: Int = 0,
-    val rack: MutableList<ServerTile> = mutableListOf(),
+    val rack: MutableList<Tile> = mutableListOf(),
     val isActive: Boolean = true
 ) {
     fun toDto(): PlayerDto {
@@ -43,7 +42,6 @@ data class ServerPlayer(
     }
 }
 
-@Serializable
 data class ServerTile(
     val letter: Char,
     val points: Int,
@@ -54,7 +52,7 @@ data class ServerTile(
  * Sac de tuiles
  */
 class TileBag {
-    private val tiles = mutableListOf<ServerTile>()
+    val tiles = mutableListOf<Tile>()
     
     init {
         initializeTiles()
@@ -82,19 +80,19 @@ class TileBag {
         
         distribution.forEach { (letter, count) ->
             repeat(count) {
-                tiles.add(ServerTile(letter, points[letter] ?: 0))
+                tiles.add(Tile(letter, value[letter] ?: 0))
             }
         }
         
         // Ajouter les 2 jokers
         repeat(2) {
-            tiles.add(ServerTile('_', 0, isJoker = true))
+            tiles.add(Tile('_', 0, isJoker = true))
         }
         
         tiles.shuffle()
     }
     
-    fun drawTiles(count: Int): List<ServerTile> {
+    fun drawTiles(count: Int): List<Tile> {
         val drawn = tiles.take(count)
         repeat(drawn.size) { tiles.removeAt(0) }
         return drawn
@@ -102,44 +100,9 @@ class TileBag {
     
     fun remainingTiles(): Int = tiles.size
     
-    fun returnTiles(tilesToReturn: List<ServerTile>) {
+    fun returnTiles(tilesToReturn: List<Tile>) {
         tiles.addAll(tilesToReturn)
         tiles.shuffle()
     }
 }
 
-// DTOs pour la sérialisation
-@Serializable
-data class GameStateDto(
-    val gameId: String,
-    val players: List<PlayerDto>,
-    val currentPlayerIndex: Int,
-    val tilesRemaining: Int,
-    val status: String,
-    val board: List<List<CellDto>>
-)
-
-@Serializable
-data class PlayerDto(
-    val id: String,
-    val name: String,
-    val score: Int,
-    val rackSize: Int,
-    val isActive: Boolean
-)
-
-@Serializable
-data class CellDto(
-    val row: Int,
-    val col: Int,
-    val tile: TileDto? = null,
-    val bonus: String,
-    val isLocked: Boolean
-)
-
-@Serializable
-data class TileDto(
-    val letter: Char,
-    val points: Int,
-    val isJoker: Boolean = false
-)

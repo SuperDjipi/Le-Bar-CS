@@ -9,9 +9,11 @@ import androidx.navigation.compose.rememberNavController
 import club.djipi.lebarcs.ui.screens.home.HomeScreen
 import club.djipi.lebarcs.ui.screens.lobby.LobbyScreen
 import club.djipi.lebarcs.ui.screens.game.GameScreen
+import club.djipi.lebarcs.ui.screens.test.TestUIScreen
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
+    object TestUI : Screen("test_ui")
     object Lobby : Screen("lobby/{gameId}") {
         fun createRoute(gameId: String) = "lobby/$gameId"
     }
@@ -35,10 +37,17 @@ fun NavGraph(
             HomeScreen(
                 onNavigateToLobby = { gameId ->
                     navController.navigate(Screen.Lobby.createRoute(gameId))
+                },
+                onNavigateToTestUI = {
+                    navController.navigate(Screen.TestUI.route)
                 }
             )
         }
-        
+
+        composable(Screen.TestUI.route) {
+            TestUIScreen()
+        }
+
         composable(Screen.Lobby.route) { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
             LobbyScreen(
@@ -53,7 +62,7 @@ fun NavGraph(
                 }
             )
         }
-        
+
         composable(Screen.Game.route) { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
             GameScreen(

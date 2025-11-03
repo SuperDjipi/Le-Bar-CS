@@ -3,7 +3,7 @@ package club.djipi.lebarcs.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
-import club.djipi.lebarcs.domain.model.GameStatus
+import club.djipi.lebarcs.shared.domain.model.GameStatus
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 

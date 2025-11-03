@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 rootProject.name = "Le Bar CS"
 include(":app")
 include(":server")
+include(":shared")

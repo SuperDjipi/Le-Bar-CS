@@ -20,6 +20,7 @@ application {
 dependencies {
     // Ktor Server
     implementation(libs.bundles.ktor.server)
+    implementation(project(":shared"))
 
     // Logging
     implementation(libs.logback.classic)
