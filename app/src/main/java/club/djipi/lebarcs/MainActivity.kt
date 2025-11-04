@@ -34,10 +34,8 @@ class MainActivity : ComponentActivity() {
 //            }
         setContent {
             LeBarCSTheme {
-                // HelloScrabbleApp()
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    NavGraph(modifier = Modifier.padding(innerPadding))
-                }
+                    NavGraph()
+
             }
         }
     }

@@ -1,5 +1,6 @@
 package club.djipi.lebarcs.ui.screens.game.components
 
+import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
@@ -20,6 +21,8 @@ import club.djipi.lebarcs.ui.screens.game.dragdrop.DragDropManager
 /**
  * Case du plateau qui peut recevoir des tuiles par drag & drop
  */
+private const val TAG = "DroppableBoardCell"
+
 @Composable
 fun DroppableBoardCell(
     cell: BoardCell,
@@ -32,18 +35,35 @@ fun DroppableBoardCell(
     val dragState = dragDropManager.state
     val localDensity = LocalDensity.current
     // Déterminer si la tuile draggée est au-dessus de cette case
-    val isHovered by remember {
-        derivedStateOf {
-            if (!dragState.isDragging) return@derivedStateOf false
+//    val isHovered by remember {
+//        derivedStateOf {
+//            if (!dragState.isDragging) return@derivedStateOf false
+//
+//            val dragX = cellPosition.x + dragState.currentPosition.x
+//            val dragY = cellPosition.y + dragState.currentPosition.y
+//            Log.d(TAG, "dragX: $dragX, dragY: $dragY")
+//
+//
+//            // Vérifier si la position du drag est dans les limites de la case
+//            val cellSize = with(localDensity) { size.toPx() }
+//            dragX >= cellPosition.x && dragX <= cellPosition.x + cellSize &&
+//                    dragY >= cellPosition.y && dragY <= cellPosition.y + cellSize
+//        }
+//    }
+    val isHovered = if (dragState.isDragging) {
+        val currentDragPosition = dragState.currentPosition
 
-            val dragX = cellPosition.x + dragState.dragOffset.x
-            val dragY = cellPosition.y + dragState.dragOffset.y
+        // Le calcul est beaucoup plus simple :
+        // La position de la souris est-elle dans le rectangle de la cellule ?
+        val cellSize = with(localDensity) { size.toPx() }
 
-            // Vérifier si la position du drag est dans les limites de la case
-            val cellSize = with(localDensity) { size.toPx() }
-            dragX >= cellPosition.x && dragX <= cellPosition.x + cellSize &&
-                    dragY >= cellPosition.y && dragY <= cellPosition.y + cellSize
-        }
+        // Log pour vérifier que les valeurs sont correctes
+        Log.d(TAG, "Vérification survol: DragPos=${currentDragPosition}, CellPos=${cellPosition}, CellSize=${cellSize}")
+
+        currentDragPosition.x >= cellPosition.x && currentDragPosition.x <= cellPosition.x + cellSize &&
+                currentDragPosition.y >= cellPosition.y && currentDragPosition.y <= cellPosition.y + cellSize
+    } else {
+        false
     }
 
     // Animation de la bordure quand on survole
@@ -60,9 +80,12 @@ fun DroppableBoardCell(
     // Notifier le manager quand on survole
     LaunchedEffect(isHovered) {
         if (isHovered && cell.tile == null) {
+            // provoque une race condition
+//            dragDropManager.setTargetPosition(cell.position)
+//        } else if (!isHovered && dragState.targetPosition == cell.position) {
+//            dragDropManager.setTargetPosition(null)
+            // Si on survole cette cellule, on la déclare comme cible. Pas de else
             dragDropManager.setTargetPosition(cell.position)
-        } else if (!isHovered && dragState.targetPosition == cell.position) {
-            dragDropManager.setTargetPosition(null)
         }
     }
 

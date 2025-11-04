@@ -1,5 +1,6 @@
 package club.djipi.lebarcs.ui.screens.game.components
 
+import android.util.Log
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
@@ -7,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -17,6 +19,8 @@ import club.djipi.lebarcs.ui.screens.game.dragdrop.DragDropManager
  * Tuile draggable depuis le chevalet
  * Ne bouge plus elle-même, notifie juste le DragDropManager
  */
+private const val TAG = "DraggableTileView"
+
 @Composable
 fun DraggableTileView(
     tile: Tile,
@@ -38,22 +42,27 @@ fun DraggableTileView(
             }
             .pointerInput(Unit) {
                 detectDragGesturesAfterLongPress(
-                    onDragStart = { offset ->
-                        // Démarrer le drag avec la position initiale
-                        dragDropManager.startDrag(tile, rackIndex, tilePosition + offset)
+                    onDragStart = { touchOffset ->
+                        // Position initiale = position de la tuile + où on a touché
+                        val initialPosition = tilePosition + touchOffset
+                        dragDropManager.startDrag(tile, rackIndex, initialPosition)
                         onDragStart()
+                        Log.d(TAG,"DRAG START: Pos=${initialPosition}.")
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        // Mettre à jour la position du drag
-                        val currentOffset = dragDropManager.state.dragOffset + dragAmount
-                        dragDropManager.updateDragPosition(currentOffset)
+                        // Position actuelle = position précédente + déplacement
+                        val newPosition = dragDropManager.state.currentPosition + dragAmount
+                        Log.d(TAG,"DRAG: Pos=${newPosition}.")
+                        dragDropManager.updateDragPosition(newPosition)
                     },
                     onDragEnd = {
+                        Log.d(TAG,"DRAG END: Action terminée.")
                         dragDropManager.endDrag()
                         onDragEnd()
                     },
                     onDragCancel = {
+                        Log.d(TAG,"DRAG CANCEL: Action annulée.")
                         dragDropManager.cancelDrag()
                         onDragEnd()
                     }

@@ -25,7 +25,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Scrabble Multijoueur",
+            text = "Le Bar CS",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold
         )

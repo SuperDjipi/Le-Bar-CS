@@ -1,5 +1,6 @@
 package club.djipi.lebarcs.ui.screens.game.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,8 @@ import club.djipi.lebarcs.ui.theme.LeBarCSTheme
 /**
  * Composant du plateau de Scrabble 15x15
  */
+private const val TAG = "BoardView"
+
 @Composable
 fun BoardView(
     board: Board,
@@ -92,6 +95,7 @@ fun BoardView(
                                 size = cellSize.dp,
                                 onClick = { onCellClick(cell.position) }
                             )
+                            Log.d(TAG, "BoardView: $cell")
                         } else {
                             // Version simple
                             BoardCellView(
