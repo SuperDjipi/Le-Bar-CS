@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import club.djipi.lebarcs.shared.domain.model.Tile
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DragDropManager
+import club.djipi.lebarcs.ui.screens.game.dragdrop.DragSource
 import club.djipi.lebarcs.ui.theme.LeBarCSTheme
 import kotlin.math.min
 
@@ -93,29 +94,15 @@ fun TileRack(
                         contentAlignment = Alignment.Center
                     ) {
                         if (i < tiles.size) {
-                            if (dragDropManager != null) {
-                                // Version avec drag & drop
-                                DraggableTileView(
+                                TileView(
                                     tile = tiles[i],
-                                    rackIndex = i,
                                     dragDropManager = dragDropManager,
+                                    source = DragSource.Rack(i),
                                     size = tileSize,
                                     isSelected = selectedIndex == i,
                                     onDragStart = { onTileDragStart(i) },
                                     onDragEnd = { onTileDragEnd(i) }
                                 )
-                            } else {
-                                // Version simple cliquable
-                                Box(
-                                    modifier = Modifier.clickable { onTileClick(i) }
-                                ) {
-                                    TileView(
-                                        tile = tiles[i],
-                                        size = tileSize,
-                                        isSelected = selectedIndex == i
-                                    )
-                                }
-                            }
                         } else {
                             // Emplacement vide
                             EmptyTileSlot(size = tileSize)

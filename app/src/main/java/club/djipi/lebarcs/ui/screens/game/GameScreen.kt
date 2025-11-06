@@ -12,23 +12,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import club.djipi.lebarcs.domain.model.*
 import club.djipi.lebarcs.shared.domain.model.*
-import club.djipi.lebarcs.ui.screens.game.components.BoardView
-import club.djipi.lebarcs.ui.screens.game.components.ScoreBoard
 import club.djipi.lebarcs.ui.screens.game.components.GameContent
 import club.djipi.lebarcs.ui.screens.game.components.TileView
-import club.djipi.lebarcs.ui.screens.game.dragdrop.DragDropManager
 import club.djipi.lebarcs.ui.screens.game.dragdrop.ProvideDragDropManager
 import club.djipi.lebarcs.ui.theme.LeBarCSTheme
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +65,8 @@ fun GameScreen(
                             dragDropManager = dragDropManager,
                             onTileSelected = viewModel::onTileSelected,
                             onCellClick = viewModel::onCellClick,
-                            onTilePlaced = viewModel::onTilePlaced,
+                            onTilePlacedFromRack = viewModel::onTilePlacedFromRack,
+                            onTileMovedOnBoard = viewModel::onTileMovedOnBoard,
                             onPlayMove = viewModel::onPlayMove,
                             onPass = viewModel::onPass,
                             modifier = Modifier.padding(paddingValues)
@@ -120,8 +110,8 @@ fun GameScreen(
                         .offset {
                             // On utilise les coordonnées globales directement
                             androidx.compose.ui.unit.IntOffset(
-                                x = (state.currentPosition.x - tileSizePx / 2).toInt(),
-                                y = (state.currentPosition.y - tileSizePx / 2).toInt()
+                                x = (state.currentCoordinates.x - tileSizePx / 2).toInt(),
+                                y = (state.currentCoordinates.y - tileSizePx / 2).toInt()
                             )
                         }
                 ) {
@@ -129,9 +119,9 @@ fun GameScreen(
                         tile = state.draggedTile!!,
                         size = tileSize,
                         modifier = Modifier.graphicsLayer {
-                            //scaleX = 1.3f
-                            //scaleY = 1.3f
-                            //shadowElevation = 16f
+                            scaleX = 1.3f
+                            scaleY = 1.3f
+                            shadowElevation = 16f
                             alpha = 0.7f
                         }
                     )
@@ -168,7 +158,8 @@ fun GameScreenPreview() {
                 dragDropManager = dragDropManager,
                 onTileSelected = {},
                 onCellClick = {},
-                onTilePlaced = { _, _ -> },
+                onTilePlacedFromRack = { _, _ -> },
+                onTileMovedOnBoard = { _, _ -> },
                 onPlayMove = {},
                 onPass = {}
             )

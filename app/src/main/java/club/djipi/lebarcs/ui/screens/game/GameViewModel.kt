@@ -63,7 +63,7 @@ class GameViewModel @Inject constructor(
         println("Clicked on cell: $position")
     }
 
-    fun onTilePlaced(rackIndex: Int, position: Position) {
+    fun onTilePlacedFromRack(rackIndex: Int, position: Position) {
         val currentState = _uiState.value
         if (currentState is GameUiState.Playing) {
             val tile = currentState.gameData.currentPlayerRack.getOrNull(rackIndex) ?: return
@@ -75,7 +75,7 @@ class GameViewModel @Inject constructor(
             val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
 
             // Mettre à jour le plateau
-            val newBoard = updateBoardWithTile(currentState.gameData.board, tile, position)
+            val newBoard = updateBoardWithTileFromRack(currentState.gameData.board, tile, position)
 
             // Retirer la tuile du chevalet
             val newRack = currentState.gameData.currentPlayerRack.toMutableList().apply {
@@ -94,11 +94,47 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    private fun updateBoardWithTile(board: Board, tile: Tile, position: Position): Board {
+    fun onTileMovedOnBoard(fromPosition: Position, toPosition: Position) {
+        val currentState = _uiState.value
+        if (currentState is GameUiState.Playing) {
+            println("✅ Tuile déplacée de $fromPosition à $toPosition")
+
+            // Logique à implémenter :
+            // 1. Trouver la tuile à la position 'fromPosition' sur le plateau.
+            // 2. Vérifier que 'toPosition' est libre.
+            // 3. Mettre à jour le plateau : retirer la tuile de 'from' et la mettre à 'to'.
+            val newBoard = updateBoardWithTileFromBoard(currentState.gameData.board, fromPosition, toPosition)
+            // 4. Emettre le nouvel état.
+            _uiState.update {
+                currentState.copy(
+                    gameData = currentState.gameData.copy(
+                        board = newBoard
+                    )
+                )
+            }
+        }
+    }
+
+    private fun updateBoardWithTileFromRack(board: Board, tile: Tile, position: Position): Board {
         val newCells = board.cells.mapIndexed { rowIndex, row ->
             row.mapIndexed { colIndex, cell ->
                 if (rowIndex == position.row && colIndex == position.col) {
                     cell.copy(tile = tile, isLocked = false)
+                } else {
+                    cell
+                }
+            }
+        }
+        return Board(newCells)
+    }
+
+    private fun updateBoardWithTileFromBoard(board: Board, fromPosition: Position, toPosition: Position): Board {
+        val newCells = board.cells.mapIndexed { rowIndex, row ->
+            row.mapIndexed { colIndex, cell ->
+                if (rowIndex == fromPosition.row && colIndex == fromPosition.col) {
+                    cell.copy(tile = null, isLocked = false)
+                } else if (rowIndex == toPosition.row && colIndex == toPosition.col) {
+                    cell.copy(tile = board.cells[fromPosition.row][fromPosition.col].tile, isLocked = false)
                 } else {
                     cell
                 }
