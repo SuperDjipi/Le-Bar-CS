@@ -1,8 +1,12 @@
 package club.djipi.lebarcs.ui.screens.game
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import club.djipi.lebarcs.domain.model.PlacedTile
 import club.djipi.lebarcs.domain.model.Player
+import club.djipi.lebarcs.shared.domain.logic.Dictionary
+import club.djipi.lebarcs.shared.domain.logic.ScoreCalculator
+import club.djipi.lebarcs.shared.domain.logic.WordFinder
 import club.djipi.lebarcs.shared.domain.model.Board
 import club.djipi.lebarcs.shared.domain.model.Position
 import club.djipi.lebarcs.shared.domain.model.Tile
@@ -13,10 +17,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
+private const val TAG = "GameViewModel"
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    // TODO: Injecter le repository
+    private val dictionary: Dictionary
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
@@ -29,13 +34,13 @@ class GameViewModel @Inject constructor(
     private fun loadMockGameData() {
         val mockPlayers = listOf(
             Player("1", "Vous", 42, listOf(
-                Tile('S', 1),
-                Tile('C', 3),
-                Tile('R', 1),
-                Tile('A', 1),
-                Tile('B', 3),
-                Tile('L', 1),
-                Tile('E', 1)
+                Tile(letter = 'S', points = 1),
+                Tile(letter = 'C', points = 3),
+                Tile(letter = 'R', points = 1),
+                Tile(letter = 'A', points = 1),
+                Tile(letter = 'B', points = 3),
+                Tile(letter = 'L', points = 1),
+                Tile(letter = 'E', points = 1)
             )),
             Player("2", "Adversaire", 38, emptyList())
         )
@@ -46,7 +51,6 @@ class GameViewModel @Inject constructor(
                 board = Board(),
                 currentPlayerIndex = 0,
                 currentPlayerRack = mockPlayers[0].rack,
-                placedTiles = emptyList()
             )
         )
     }
@@ -67,54 +71,80 @@ class GameViewModel @Inject constructor(
         val currentState = _uiState.value
         if (currentState is GameUiState.Playing) {
             val tile = currentState.gameData.currentPlayerRack.getOrNull(rackIndex) ?: return
-
-            println("✅ Tuile '${tile.letter}' placée à la position ${position.row},${position.col}")
-
-            // Ajouter la tuile aux tuiles placées
+            // 1. On prépare les données pour la mise à jour de l'état
             val newPlacedTile = PlacedTile(tile, position)
             val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
-
-            // Mettre à jour le plateau
+            val newRack = currentState.gameData.currentPlayerRack.toMutableList().apply { removeAt(rackIndex) }
             val newBoard = updateBoardWithTileFromRack(currentState.gameData.board, tile, position)
-
-            // Retirer la tuile du chevalet
-            val newRack = currentState.gameData.currentPlayerRack.toMutableList().apply {
-                removeAt(rackIndex)
-            }
-
-            _uiState.update {
-                currentState.copy(
-                    gameData = currentState.gameData.copy(
-                        board = newBoard,
-                        currentPlayerRack = newRack,
-                        placedTiles = updatedPlacedTiles
-                    )
-                )
-            }
+            updateStateWithNewMove(currentState, newBoard, updatedPlacedTiles, newRack)
         }
     }
 
     fun onTileMovedOnBoard(fromPosition: Position, toPosition: Position) {
         val currentState = _uiState.value
         if (currentState is GameUiState.Playing) {
-            println("✅ Tuile déplacée de $fromPosition à $toPosition")
-
-            // Logique à implémenter :
-            // 1. Trouver la tuile à la position 'fromPosition' sur le plateau.
-            // 2. Vérifier que 'toPosition' est libre.
-            // 3. Mettre à jour le plateau : retirer la tuile de 'from' et la mettre à 'to'.
+            // Le déplacement d'une tuile ne change ni le rack, ni les tuiles posées dans le tour.
+            val updatedPlacedTiles = currentState.gameData.placedTiles.map {
+                if (it.position == fromPosition) {
+                    it.copy(position = toPosition) // On met juste à jour la position de la tuile déplacée
+                } else {
+                    it
+                }
+            }
             val newBoard = updateBoardWithTileFromBoard(currentState.gameData.board, fromPosition, toPosition)
-            // 4. Emettre le nouvel état.
-            _uiState.update {
-                currentState.copy(
-                    gameData = currentState.gameData.copy(
-                        board = newBoard
-                    )
+            updateStateWithNewMove(currentState, newBoard, updatedPlacedTiles, currentState.gameData.currentPlayerRack)
+        }
+    }
+
+    // NOUVELLE FONCTION pour Board -> Rack
+    fun onTileReturnedToRack(fromPosition: Position) {
+        _uiState.update { currentState ->
+            if (currentState is GameUiState.Playing) {
+                val board = currentState.gameData.board
+                val tileToReturn = board.cells[fromPosition.row][fromPosition.col].tile ?: return@update currentState
+
+                // 1. Crée un nouveau plateau sans la tuile
+                val newBoard = updateBoardWithTileFromBoard(board, fromPosition, null) // 'null' pour effacer
+
+                // 2. Crée un nouveau chevalet avec la tuile revenue
+                val newRack = currentState.gameData.currentPlayerRack + tileToReturn
+
+                // 3. Appelle la fonction de mise à jour commune
+                updateStateWithNewMove(
+                    currentState = currentState,
+                    newBoard = newBoard,
+                    newPlacedTiles = currentState.gameData.placedTiles.filter { it.position != fromPosition },
+                    newRack = newRack
                 )
+                currentState // Retourne l'état mis à jour via l'helper
+            } else {
+                currentState
             }
         }
     }
 
+    // NOUVELLE FONCTION pour Rack -> Rack
+    fun onRackTilesReordered(fromIndex: Int, toIndex: Int) {
+        _uiState.update { currentState ->
+            if (currentState is GameUiState.Playing) {
+                val currentRack = currentState.gameData.currentPlayerRack.toMutableList()
+                if (fromIndex < 0 || fromIndex >= currentRack.size || toIndex < 0 || toIndex > currentRack.size) {
+                    return@update currentState // Sécurité pour éviter les crashs
+                }
+
+                // Réorganise la liste
+                val draggedTile = currentRack.removeAt(fromIndex)
+                currentRack.add(toIndex.coerceAtMost(currentRack.size), draggedTile)
+
+                // Pas besoin d'appeler l'helper de calcul de score, on met juste à jour le chevalet
+                currentState.copy(
+                    gameData = currentState.gameData.copy(currentPlayerRack = currentRack,)
+                )
+            } else {
+                currentState
+            }
+        }
+    }
     private fun updateBoardWithTileFromRack(board: Board, tile: Tile, position: Position): Board {
         val newCells = board.cells.mapIndexed { rowIndex, row ->
             row.mapIndexed { colIndex, cell ->
@@ -128,12 +158,12 @@ class GameViewModel @Inject constructor(
         return Board(newCells)
     }
 
-    private fun updateBoardWithTileFromBoard(board: Board, fromPosition: Position, toPosition: Position): Board {
+    private fun updateBoardWithTileFromBoard(board: Board, fromPosition: Position, toPosition: Position?): Board {
         val newCells = board.cells.mapIndexed { rowIndex, row ->
             row.mapIndexed { colIndex, cell ->
                 if (rowIndex == fromPosition.row && colIndex == fromPosition.col) {
                     cell.copy(tile = null, isLocked = false)
-                } else if (rowIndex == toPosition.row && colIndex == toPosition.col) {
+                } else if (rowIndex == toPosition?.row && colIndex == toPosition.col) {
                     cell.copy(tile = board.cells[fromPosition.row][fromPosition.col].tile, isLocked = false)
                 } else {
                     cell
@@ -142,16 +172,61 @@ class GameViewModel @Inject constructor(
         }
         return Board(newCells)
     }
+    private fun updateStateWithNewMove(
+        currentState: GameUiState.Playing,
+        newBoard: Board,
+        newPlacedTiles: List<PlacedTile>,
+        newRack: List<Tile> // On ajoute le nouveau rack en paramètre
+    ) {
+        val placedTilesMap = newPlacedTiles.associate { it.position to it.tile }
+        val foundWords = WordFinder.findAllWordsFormedByMove(newBoard, placedTilesMap)
 
+        // On vérifie si TOUS les mots trouvés sont valides.
+        val allWordsAreValid = foundWords.all { dictionary.isValid(it.text) }
+
+        // Si un mot n'est pas valide, on pourrait gérer une erreur.
+        // Pour l'instant, on peut l'afficher dans les logs.
+        if (!allWordsAreValid) {
+            val invalidWords = foundWords.filterNot { dictionary.isValid(it.text) }
+            Log.e("GameViewModel", "Mots invalides trouvés: $invalidWords")
+            // Ici, vous pourriez mettre à jour l'état de l'UI pour montrer une erreur.
+            // Par exemple : _uiState.update { currentState.copy(moveError = "Mot non valide") }
+        }
+        var totalScore = 0
+        // On ne calcule le score que si les mots sont valides.
+        if (allWordsAreValid) {
+        foundWords.forEach { word ->
+            totalScore += ScoreCalculator.calculateScore(
+                word,
+                newBoard,
+                placedTilesMap.keys.toList()
+            )
+        }
+        if (placedTilesMap.size == 7) {
+            totalScore += 50
+        }}
+        Log.d(TAG, "Mots recalculés: ${foundWords.joinToString { it.text }}, Score: $totalScore")
+
+        _uiState.update {
+            currentState.copy(
+                gameData = currentState.gameData.copy(
+                    board = newBoard,
+                    currentPlayerRack = newRack, // On met à jour le rack
+                    placedTiles = newPlacedTiles,
+                    foundWords = foundWords.toList(),
+                    currentMoveScore = totalScore,
+                    areWordsValid = allWordsAreValid
+                )
+            )
+        }
+    }
     fun onShuffleRack() {
         val currentState = _uiState.value
         if (currentState is GameUiState.Playing) {
             val shuffledRack = currentState.gameData.currentPlayerRack.shuffled()
             _uiState.update {
                 currentState.copy(
-                    gameData = currentState.gameData.copy(
-                        currentPlayerRack = shuffledRack
-                    )
+                    gameData = currentState.gameData.copy(currentPlayerRack = shuffledRack)
                 )
             }
         }

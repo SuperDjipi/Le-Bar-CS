@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import club.djipi.lebarcs.shared.domain.model.Tile
 
 private const val TAG = "DragDropManager"
@@ -25,6 +26,12 @@ val LocalDragDropState = compositionLocalOf {
 class DragDropManager {
     var state by mutableStateOf(DragDropState())
         private set
+
+    // Chevalet : limites et enregistrement
+    private var rackBounds: Rect? = null
+    fun registerRackArea(bounds: Rect) {
+        this.rackBounds = bounds
+    }
 
     fun startDrag(tile: Tile, source: DragSource, startCoordinates: Offset) {
         state = DragDropState(

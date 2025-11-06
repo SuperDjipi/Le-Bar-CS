@@ -30,6 +30,8 @@ fun GameContent(
     onCellClick: (Position) -> Unit,
     onTilePlacedFromRack: (rackIndex: Int, position: Position) -> Unit,
     onTileMovedOnBoard: (from: Position, to: Position) -> Unit,
+    onTileReturnedToRack: (from: Position) -> Unit,
+    onRackTilesReordered: (from: Int, to: Int) -> Unit,
     onPlayMove: () -> Unit,
     onPass: () -> Unit,
     modifier: Modifier = Modifier
@@ -52,9 +54,15 @@ fun GameContent(
             }
             if (source is DragSource.Board && target is DropTarget.Rack) {
                 // Logique pour remettre sur le chevalet...
+                Log.d(TAG, "Drop détecté : Plateau -> Chevalet")
+                onTileReturnedToRack(source.position)
             }
             if (source is DragSource.Rack && target is DropTarget.Rack) {
                 // Logique pour réorganiser le chevalet...
+                Log.d(TAG, "Drop détecté : Chevalet -> Chevalet")
+                if (source.index != target.index) { // On ne fait rien si on drop sur soi-même
+                    onRackTilesReordered(source.index, target.index)
+                }
             }
 
             dragDropManager.consumeDropEvent()

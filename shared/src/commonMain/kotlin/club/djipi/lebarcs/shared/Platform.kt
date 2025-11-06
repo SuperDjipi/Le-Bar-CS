@@ -13,3 +13,5 @@ expect fun platform(): String
  * L'implémentation sera fournie par chaque plateforme.
  */
 expect fun getCurrentTimestamp(): Long
+
+expect fun generateUUID(): String

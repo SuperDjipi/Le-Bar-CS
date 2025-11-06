@@ -67,6 +67,8 @@ fun GameScreen(
                             onCellClick = viewModel::onCellClick,
                             onTilePlacedFromRack = viewModel::onTilePlacedFromRack,
                             onTileMovedOnBoard = viewModel::onTileMovedOnBoard,
+                            onTileReturnedToRack = viewModel::onTileReturnedToRack,
+                            onRackTilesReordered = viewModel::onRackTilesReordered,
                             onPlayMove = viewModel::onPlayMove,
                             onPass = viewModel::onPass,
                             modifier = Modifier.padding(paddingValues)
@@ -147,12 +149,12 @@ fun GameScreenPreview() {
                     board = Board(),
                     currentPlayerIndex = 0,
                     currentPlayerRack = listOf(
-                        Tile('H', 4),
-                        Tile('E', 1),
-                        Tile('L', 1),
-                        Tile('L', 1),
-                        Tile('O', 1)
-                    )
+                        Tile(letter = 'H', points=4),
+                        Tile(letter = 'E', points=1),
+                        Tile(letter = 'L', points=1),
+                        Tile(letter = 'L', points=1),
+                        Tile(letter = 'O', points=1)
+                    ),
                 ),
                 selectedTileIndex = null,
                 dragDropManager = dragDropManager,
@@ -160,6 +162,8 @@ fun GameScreenPreview() {
                 onCellClick = {},
                 onTilePlacedFromRack = { _, _ -> },
                 onTileMovedOnBoard = { _, _ -> },
+                onTileReturnedToRack = {},
+                onRackTilesReordered = { _, _ -> },
                 onPlayMove = {},
                 onPass = {}
             )

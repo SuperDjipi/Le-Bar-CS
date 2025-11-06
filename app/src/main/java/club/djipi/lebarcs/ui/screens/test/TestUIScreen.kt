@@ -42,11 +42,11 @@ fun TestUIScreen() {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TileView(tile = Tile('A', 1))
-                TileView(tile = Tile('K', 10))
-                TileView(tile = Tile('Z', 10))
-                TileView(tile = Tile('_', 0, isJoker = true))
-                TileView(tile = Tile('E', 1), isSelected = true)
+                TileView(tile = Tile(letter = 'A', points = 1))
+                TileView(tile = Tile(letter = 'K', points = 10))
+                TileView(tile = Tile(letter = 'Z', points = 10))
+                TileView(tile = Tile(letter = '_', points = 0, isJoker = true))
+                TileView(tile = Tile(letter = 'E', points = 1), isSelected = true)
             }
 
             Divider()
@@ -55,13 +55,13 @@ fun TestUIScreen() {
             Text("Chevalet complet", style = MaterialTheme.typography.titleLarge)
             TileRack(
                 tiles = listOf(
-                    Tile('S', 1),
-                    Tile('C', 3),
-                    Tile('R', 1),
-                    Tile('A', 1),
-                    Tile('B', 3),
-                    Tile('L', 1),
-                    Tile('E', 1)
+                    Tile(letter = 'S', points = 1),
+                    Tile(letter = 'C', points = 3),
+                    Tile(letter = 'R', points = 1),
+                    Tile(letter = 'A', points = 1),
+                    Tile(letter = 'B', points = 3),
+                    Tile(letter = 'L', points = 1),
+                    Tile(letter = 'E', points = 1)
                 ),
                 selectedIndex = selectedTileIndex,
                 onTileClick = {
@@ -72,9 +72,9 @@ fun TestUIScreen() {
             Text("Chevalet partiel", style = MaterialTheme.typography.titleLarge)
             TileRack(
                 tiles = listOf(
-                    Tile('H', 4),
-                    Tile('E', 1),
-                    Tile('L', 1)
+                    Tile(letter = 'H', points = 4),
+                    Tile(letter = 'E', points = 1),
+                    Tile(letter = 'L', points = 1)
                 )
             )
 
@@ -126,7 +126,7 @@ fun TestUIScreen() {
                     cell = BoardCell(
                         Position(0, 0),
                         BonusType.NONE,
-                        Tile('H', 4),
+                        Tile(letter = 'H', points = 4),
                         isLocked = true
                     )
                 )
@@ -134,7 +134,7 @@ fun TestUIScreen() {
                     cell = BoardCell(
                         Position(0, 1),
                         BonusType.DOUBLE_LETTER,
-                        Tile('E', 1),
+                        Tile(letter = 'E', points = 1),
                         isLocked = true
                     )
                 )
@@ -142,7 +142,7 @@ fun TestUIScreen() {
                     cell = BoardCell(
                         Position(0, 2),
                         BonusType.NONE,
-                        Tile('L', 1),
+                        Tile(letter = 'L', points = 1),
                         isLocked = true
                     )
                 )

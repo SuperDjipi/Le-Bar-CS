@@ -1,6 +1,7 @@
 package club.djipi.lebarcs.di
 
 import android.content.Context
+import club.djipi.lebarcs.util.AndroidResourceReader
 import androidx.room.Room
 import club.djipi.lebarcs.data.local.ScrabbleDatabase
 import club.djipi.lebarcs.data.local.dao.GameDao
@@ -8,6 +9,8 @@ import club.djipi.lebarcs.data.local.dao.PlayerDao
 import club.djipi.lebarcs.data.remote.WebSocketClient
 import club.djipi.lebarcs.data.repository.GameRepository
 import club.djipi.lebarcs.data.repository.GameRepositoryImpl
+import club.djipi.lebarcs.shared.domain.logic.Dictionary
+import club.djipi.lebarcs.util.ResourceReader
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -119,4 +122,19 @@ object AppModule {
         // return "ws://localhost:8080" // Appareil physique en USB
         // return "ws://YOUR_SERVER_IP:8080" // Production
     }
+
+    @Provides
+    @Singleton
+    fun provideResourceReader(@ApplicationContext context: Context): ResourceReader {
+        // Hilt nous fournit le contexte, et nous créons la bonne classe.
+        return AndroidResourceReader(context)
+    }
+    // On dit à Hilt comment créer un Dictionary
+    @Provides
+    @Singleton
+    fun provideDictionary(resourceReader: ResourceReader): Dictionary {
+        return Dictionary(resourceReader)
+    }
+
 }
+

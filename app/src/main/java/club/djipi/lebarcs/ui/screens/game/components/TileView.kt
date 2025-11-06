@@ -158,11 +158,11 @@ fun TileViewPreview() {
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TileView(tile = Tile('A', 1))
-            TileView(tile = Tile('K', 10))
-            TileView(tile = Tile('_', 0, isJoker = true))
-            TileView(tile = Tile('E', 1), isSelected = true)
-            TileView(tile = Tile('Z', 10), enabled = false)
+            TileView(tile = Tile(letter = 'A', points = 1))
+            TileView(tile = Tile(letter = 'K', points = 10))
+            TileView(tile = Tile(letter = '_', points = 0, isJoker = true))
+            TileView(tile = Tile(letter = 'E', points = 1), isSelected = true)
+            TileView(tile = Tile(letter = 'Z', points = 10), enabled = false)
         }
     }
 }
