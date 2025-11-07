@@ -24,7 +24,9 @@ data class GameData(
     val placedTiles: List<PlacedTile> = emptyList(),
     val foundWords: List<FoundWord> = emptyList(),
     val currentMoveScore: Int = 0,
-    val areWordsValid: Boolean = false
+    val isPlacementValid: Boolean = true, // par défaut, un coup est valide en géométrie
+    val areWordsValid: Boolean = true,      // Par défaut, il n'y a pas de mots invalides
+    val isCurrentMoveValid: Boolean = false // Par défaut, un coup vide n'est pas jouable
 ) {
     val hasPlacedTiles: Boolean
         get() = placedTiles.isNotEmpty()

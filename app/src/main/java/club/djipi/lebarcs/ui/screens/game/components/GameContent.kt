@@ -6,7 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +39,8 @@ fun GameContent(
     onTileMovedOnBoard: (from: Position, to: Position) -> Unit,
     onTileReturnedToRack: (from: Position) -> Unit,
     onRackTilesReordered: (from: Int, to: Int) -> Unit,
+    onShuffleRack: () -> Unit,
+    onUndoMove: () -> Unit,
     onPlayMove: () -> Unit,
     onPass: () -> Unit,
     modifier: Modifier = Modifier
@@ -110,23 +119,48 @@ fun GameContent(
 
         // Boutons d'action
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Bouton Mélanger
+            OutlinedButton(
+                onClick = onShuffleRack,
+                modifier = Modifier.weight(1f)
+            ) {
+                //Text("Mélanger")
+                Icon(Icons.Default.Refresh, "Mélanger")
+            }
+
+            // Bouton Annuler
+            OutlinedButton(
+                onClick = onUndoMove,
+                modifier = Modifier.weight(1f),
+                // Le bouton n'est actif que si des tuiles ont été posées
+                enabled = gameData.placedTiles.isNotEmpty()
+            ) {
+                //Text("Annuler")
+                Icon(Icons.Default.ArrowDropDown, "Annuler")
+            }
+
+            // Bouton Passer
             OutlinedButton(
                 onClick = onPass,
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Passer")
+                //Text("Passer")
+                Icon(Icons.Default.Close, "Passer")
             }
 
+            // Bouton Jouer (le plus important)
             Button(
                 onClick = onPlayMove,
                 modifier = Modifier.weight(1f),
-                enabled = gameData.hasPlacedTiles
+                enabled = gameData.isCurrentMoveValid
             ) {
-                Text("Jouer")
+                Icon(Icons.Default.Done, "Jouer")
+                Text("${gameData.currentMoveScore}")
             }
+
         }
     }
 }

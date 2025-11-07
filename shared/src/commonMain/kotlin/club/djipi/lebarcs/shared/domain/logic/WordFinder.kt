@@ -48,7 +48,33 @@ object WordFinder {
     }
 
     // On créera une fonction similaire `findVerticalWord(...)`
-    fun findVerticalWord(board: Board, startPos: Position): FoundWord? { return null/* ... */ }
+    fun findVerticalWord(board: Board, startPos: Position): FoundWord? {
+
+        // 1. Trouver le début du mot (en remontant les lignes)
+        var startIndex = startPos.row
+        while (startIndex > 0 && board.cells[startIndex - 1][startPos.col].tile != null) {
+            startIndex--
+        }
+
+        // 2. Trouver la fin du mot (en descendant les lignes)
+        var endIndex = startPos.row
+        while (endIndex < Board.SIZE - 1 && board.cells[endIndex + 1][startPos.col].tile != null) {
+            endIndex++
+        }
+
+        // 3. Si le mot a une longueur > 1, on le construit
+        if (startIndex == endIndex) return null // Mot d'une seule lettre, non connecté verticalement
+
+        val wordTiles = mutableListOf<Pair<Position, Tile>>()
+        var wordText = ""
+        for (row in startIndex..endIndex) {
+            val tile = board.cells[row][startPos.col].tile ?: return null // Sécurité
+            wordText += tile.letter
+            wordTiles.add(Position(row, startPos.col) to tile)
+        }
+
+        return FoundWord(wordText, wordTiles, Direction.VERTICAL)
+    }
 
 
     /**
@@ -65,8 +91,12 @@ object WordFinder {
         // Pour chaque tuile posée...
         placedTiles.keys.forEach { pos ->
             // ... on trouve le mot horizontal et le mot vertical qui la traversent
-            findHorizontalWord(board, pos)?.let { allWords.add(it) }
-            findVerticalWord(board, pos)?.let { allWords.add(it) }
+            findHorizontalWord(board, pos)?.let {
+                println("WordFinder : Mot horizontal trouvé : ${it.text}")
+                allWords.add(it) }
+            findVerticalWord(board, pos)?.let {
+                println("WordFinder : Mot vertical trouvé : ${it.text}")
+                allWords.add(it) }
         }
 
         return allWords

@@ -9,7 +9,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import club.djipi.lebarcs.domain.model.*
@@ -37,11 +39,11 @@ fun GameScreen(
                             IconButton(onClick = onNavigateBack) {
                                 Icon(Icons.Default.ArrowBack, "Retour")
                             }
-                        },
-                        actions = {
-                            IconButton(onClick = { viewModel.onShuffleRack() }) {
-                                Icon(Icons.Default.Refresh, "Mélanger")
-                            }
+//                        },
+//                        actions = {
+//                            IconButton(onClick = { viewModel.onShuffleRack() }) {
+//                                Icon(Icons.Default.Refresh, "Mélanger")
+//                            }
                         }
                     )
                 }
@@ -71,6 +73,8 @@ fun GameScreen(
                             onRackTilesReordered = viewModel::onRackTilesReordered,
                             onPlayMove = viewModel::onPlayMove,
                             onPass = viewModel::onPass,
+                            onUndoMove = viewModel::onUndoMove,
+                            onShuffleRack = viewModel::onShuffleRack,
                             modifier = Modifier.padding(paddingValues)
                         )
                     }
@@ -104,14 +108,14 @@ fun GameScreen(
                 val state = dragDropManager.state
                 val tileSize = 60.dp
                 val tileSizePx =
-                    with(androidx.compose.ui.platform.LocalDensity.current) { tileSize.toPx() }
+                    with(LocalDensity.current) { tileSize.toPx() }
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize() // Prend tout l'écran
                         .offset {
                             // On utilise les coordonnées globales directement
-                            androidx.compose.ui.unit.IntOffset(
+                            IntOffset(
                                 x = (state.currentCoordinates.x - tileSizePx / 2).toInt(),
                                 y = (state.currentCoordinates.y - tileSizePx / 2).toInt()
                             )
@@ -149,11 +153,11 @@ fun GameScreenPreview() {
                     board = Board(),
                     currentPlayerIndex = 0,
                     currentPlayerRack = listOf(
-                        Tile(letter = 'H', points=4),
-                        Tile(letter = 'E', points=1),
-                        Tile(letter = 'L', points=1),
-                        Tile(letter = 'L', points=1),
-                        Tile(letter = 'O', points=1)
+                        Tile(letter = 'H', points = 4),
+                        Tile(letter = 'E', points = 1),
+                        Tile(letter = 'L', points = 1),
+                        Tile(letter = 'L', points = 1),
+                        Tile(letter = 'O', points = 1)
                     ),
                 ),
                 selectedTileIndex = null,
@@ -165,7 +169,9 @@ fun GameScreenPreview() {
                 onTileReturnedToRack = {},
                 onRackTilesReordered = { _, _ -> },
                 onPlayMove = {},
-                onPass = {}
+                onPass = {},
+                onShuffleRack = {},
+                onUndoMove = {}
             )
         }
     }

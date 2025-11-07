@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import club.djipi.lebarcs.domain.model.PlacedTile
 import club.djipi.lebarcs.domain.model.Player
 import club.djipi.lebarcs.shared.domain.logic.Dictionary
+import club.djipi.lebarcs.shared.domain.logic.MoveValidator
 import club.djipi.lebarcs.shared.domain.logic.ScoreCalculator
 import club.djipi.lebarcs.shared.domain.logic.WordFinder
 import club.djipi.lebarcs.shared.domain.model.Board
@@ -179,43 +180,50 @@ class GameViewModel @Inject constructor(
         newRack: List<Tile> // On ajoute le nouveau rack en paramètre
     ) {
         val placedTilesMap = newPlacedTiles.associate { it.position to it.tile }
+        // Si aucune tuile n'est posée, le coup est "vide" mais valide pour continuer.
+        if (newPlacedTiles.isEmpty()) {
+            _uiState.update {
+                currentState.copy(
+                    gameData = currentState.gameData.copy(
+                        board = newBoard,
+                        currentPlayerRack = newRack,
+                        placedTiles = emptyList(),
+                        foundWords = emptyList(),
+                        currentMoveScore = 0,
+                        isCurrentMoveValid = false // Un coup vide n'est pas jouable
+                    )
+                )}
+            return
+        }
+        val isPlacementValid = MoveValidator.isPlacementValid(placedTilesMap.keys)
         val foundWords = WordFinder.findAllWordsFormedByMove(newBoard, placedTilesMap)
+        val allWordsAreInDico = foundWords.isNotEmpty() && foundWords.all { dictionary.isValid(it.text) }
 
-        // On vérifie si TOUS les mots trouvés sont valides.
-        val allWordsAreValid = foundWords.all { dictionary.isValid(it.text) }
-
-        // Si un mot n'est pas valide, on pourrait gérer une erreur.
-        // Pour l'instant, on peut l'afficher dans les logs.
-        if (!allWordsAreValid) {
-            val invalidWords = foundWords.filterNot { dictionary.isValid(it.text) }
-            Log.e("GameViewModel", "Mots invalides trouvés: $invalidWords")
-            // Ici, vous pourriez mettre à jour l'état de l'UI pour montrer une erreur.
-            // Par exemple : _uiState.update { currentState.copy(moveError = "Mot non valide") }
-        }
+        val isMovePlayable = isPlacementValid && allWordsAreInDico
         var totalScore = 0
-        // On ne calcule le score que si les mots sont valides.
-        if (allWordsAreValid) {
-        foundWords.forEach { word ->
-            totalScore += ScoreCalculator.calculateScore(
-                word,
-                newBoard,
-                placedTilesMap.keys.toList()
-            )
+        // On calcule le score seulement si le coup est potentiellement jouable.
+        if (isMovePlayable) {
+            foundWords.forEach{ word ->
+                totalScore += ScoreCalculator.calculateScore(word, newBoard, placedTilesMap.keys.toList())
+            }
+            if (placedTilesMap.size == 7) {
+                totalScore += 50
+            }
         }
-        if (placedTilesMap.size == 7) {
-            totalScore += 50
-        }}
-        Log.d(TAG, "Mots recalculés: ${foundWords.joinToString { it.text }}, Score: $totalScore")
+
+
 
         _uiState.update {
             currentState.copy(
                 gameData = currentState.gameData.copy(
                     board = newBoard,
-                    currentPlayerRack = newRack, // On met à jour le rack
+                    currentPlayerRack = newRack,
                     placedTiles = newPlacedTiles,
                     foundWords = foundWords.toList(),
                     currentMoveScore = totalScore,
-                    areWordsValid = allWordsAreValid
+                    isPlacementValid = isPlacementValid,
+                    areWordsValid = allWordsAreInDico,
+                    isCurrentMoveValid = isMovePlayable
                 )
             )
         }
@@ -231,6 +239,51 @@ class GameViewModel @Inject constructor(
             }
         }
     }
+
+    /** Annule le coup en cours en remettant toutes les tuiles posées
+     * sur le plateau dans le chevalet du joueur.
+     */
+    fun onUndoMove() {
+        _uiState.update { currentState ->
+            if (currentState is GameUiState.Playing) {
+                val gameData = currentState.gameData
+                if (gameData.placedTiles.isEmpty()) {
+                    // S'il n'y a aucune tuile à annuler, on ne fait rien.
+                    return@update currentState
+                }
+
+                // 1. On récupère les tuiles qui avaient été posées
+                val tilesToReturn = gameData.placedTiles.map { it.tile }
+
+                // 2. On recrée un chevalet avec les tuiles du chevalet actuel ET les tuiles retournées
+                val newRack = gameData.currentPlayerRack + tilesToReturn
+
+                // 3. On recrée un plateau propre, sans les tuiles qui venaient d'être posées.
+                // Pour cela, on part du plateau *d'origine* (avant le début du coup).
+                // Si on ne l'a pas, on peut le reconstruire en retirant les 'placedTiles'.
+                var newBoard = gameData.board
+                gameData.placedTiles.forEach { placedTile ->
+                    newBoard = updateBoardWithTileFromBoard(newBoard, placedTile.position, null) // 'null' pour effacer
+                }
+
+                // 4. On réinitialise complètement l'état du coup en cours
+                currentState.copy(
+                    gameData = gameData.copy(
+                        board = newBoard,
+                        currentPlayerRack = newRack,
+                        placedTiles = emptyList(), // Le coup en cours est vide
+                        foundWords = emptyList(),
+                        currentMoveScore = 0,
+                        isCurrentMoveValid = false
+                    )
+                )
+            } else {
+                currentState
+            }
+        }
+    }
+
+
 
     fun onPlayMove() {
         val currentState = _uiState.value
