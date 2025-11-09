@@ -14,8 +14,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import club.djipi.lebarcs.domain.model.*
 import club.djipi.lebarcs.shared.domain.model.*
+import club.djipi.lebarcs.shared.generateUUID
 import club.djipi.lebarcs.ui.screens.game.components.GameContent
 import club.djipi.lebarcs.ui.screens.game.components.TileView
 import club.djipi.lebarcs.ui.screens.game.dragdrop.ProvideDragDropManager
@@ -24,9 +24,8 @@ import club.djipi.lebarcs.ui.theme.LeBarCSTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameScreen(
-    gameId: String,
     onNavigateBack: () -> Unit,
-    viewModel: GameViewModel = hiltViewModel()
+    viewModel: GameViewModel  // = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -39,11 +38,6 @@ fun GameScreen(
                             IconButton(onClick = onNavigateBack) {
                                 Icon(Icons.Default.ArrowBack, "Retour")
                             }
-//                        },
-//                        actions = {
-//                            IconButton(onClick = { viewModel.onShuffleRack() }) {
-//                                Icon(Icons.Default.Refresh, "Mélanger")
-//                            }
                         }
                     )
                 }
@@ -145,7 +139,8 @@ fun GameScreenPreview() {
     LeBarCSTheme {
         ProvideDragDropManager { dragDropManager ->
             GameContent(
-                gameData = GameData(
+                gameData = GameState(
+                    id = generateUUID(),
                     players = listOf(
                         Player("1", "Alice", 125, emptyList()),
                         Player("2", "Bob", 98, emptyList())

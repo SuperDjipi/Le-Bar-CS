@@ -20,6 +20,7 @@ object ScoreCalculator {
                     BonusType.DOUBLE_LETTER -> tileScore *= 2
                     BonusType.TRIPLE_LETTER -> tileScore *= 3
                     BonusType.DOUBLE_WORD -> wordMultiplier *= 2
+                    BonusType.CENTER -> wordMultiplier *= 2
                     BonusType.TRIPLE_WORD -> wordMultiplier *= 3
                     else -> { /* No bonus */ }
                 }

@@ -1,11 +1,11 @@
 package club.djipi.lebarcs.shared.domain.logic
 
-import  club.djipi.lebarcs.shared.domain.model.Board
+import club.djipi.lebarcs.shared.domain.model.Board
 import club.djipi.lebarcs.shared.domain.model.Direction
 import club.djipi.lebarcs.shared.domain.model.Position
 import club.djipi.lebarcs.shared.domain.model.Tile
 
-// Représente un mot trouvé sur le plateau
+// Représente un mot trouvé sur le plateau (ne change pas)
 data class FoundWord(
     val text: String,
     val tiles: List<Pair<Position, Tile>>, // Pour savoir quelles tuiles le composent
@@ -14,94 +14,102 @@ data class FoundWord(
 
 object WordFinder {
 
-    /**
-     * L'équivalent moderne de votre logique 'isoleMot'.
-     * A partir d'une position où une tuile a été posée, trouve le mot horizontal formé.
-     */
+    // --- ON RECOMMENCE ICI, PROPREMENT ---
     fun findHorizontalWord(board: Board, startPos: Position): FoundWord? {
-        val row = board.cells[startPos.row]
+        // Sécurité : on s'assure que la position de départ est valide
+        if (board.getTile(startPos) == null) {
+            return null
+        }
 
-        // 1. Trouver le début du mot
+        val boardSize = Board.SIZE
+        val row = startPos.row
+
+        // 1. Trouver la colonne de début
         var startIndex = startPos.col
-        while (startIndex > 0 && row[startIndex - 1].tile != null) {
+        while (startIndex > 0 && board.getTile(Position(row, startIndex - 1)) != null) {
             startIndex--
         }
 
-        // 2. Trouver la fin du mot
+        // 2. Trouver la colonne de fin
         var endIndex = startPos.col
-        while (endIndex < Board.SIZE - 1 && row[endIndex + 1].tile != null) {
+        while (endIndex < boardSize - 1 && board.getTile(Position(row, endIndex + 1)) != null) {
             endIndex++
         }
 
-        // 3. Si le mot a une longueur > 1, on le construit
-        if (startIndex == endIndex) return null // Mot d'une seule lettre, non connecté
+        // Si le mot ne fait qu'une lettre, on l'ignore (un mot doit être formé par au moins 2 lettres)
+        if (startIndex == endIndex) {
+            return null
+        }
 
+        // 3. Construire le mot
         val wordTiles = mutableListOf<Pair<Position, Tile>>()
         var wordText = ""
         for (col in startIndex..endIndex) {
-            val tile = row[col].tile ?: return null // Sécurité
+            val currentPos = Position(row, col)
+            val tile = board.getTile(currentPos) ?: return null // Sécurité, ne devrait jamais arriver
             wordText += tile.letter
-            wordTiles.add(Position(startPos.row, col) to tile)
+            wordTiles.add(currentPos to tile)
         }
 
         return FoundWord(wordText, wordTiles, Direction.HORIZONTAL)
     }
 
-    // On créera une fonction similaire `findVerticalWord(...)`
     fun findVerticalWord(board: Board, startPos: Position): FoundWord? {
-
-        // 1. Trouver le début du mot (en remontant les lignes)
-        var startIndex = startPos.row
-        while (startIndex > 0 && board.cells[startIndex - 1][startPos.col].tile != null) {
-            startIndex--
+        if (board.getTile(startPos) == null) {
+            return null
         }
 
-        // 2. Trouver la fin du mot (en descendant les lignes)
-        var endIndex = startPos.row
-        while (endIndex < Board.SIZE - 1 && board.cells[endIndex + 1][startPos.col].tile != null) {
-            endIndex++
+        val boardSize = Board.SIZE
+        val col = startPos.col
+
+        // 1. Trouver la ligne de début (en remontant)
+        var startRow = startPos.row
+        while (startRow > 0 && board.getTile(Position(startRow - 1, col)) != null) {
+            startRow--
         }
 
-        // 3. Si le mot a une longueur > 1, on le construit
-        if (startIndex == endIndex) return null // Mot d'une seule lettre, non connecté verticalement
+        // 2. Trouver la ligne de fin (en descendant)
+        var endRow = startPos.row
+        while (endRow < boardSize - 1 && board.getTile(Position(endRow + 1, col)) != null) {
+            endRow++
+        }
 
+        if (startRow == endRow) {
+            return null
+        }
+
+        // 3. Construire le mot
         val wordTiles = mutableListOf<Pair<Position, Tile>>()
         var wordText = ""
-        for (row in startIndex..endIndex) {
-            val tile = board.cells[row][startPos.col].tile ?: return null // Sécurité
+        for (row in startRow..endRow) {
+            val currentPos = Position(row, col)
+            val tile = board.getTile(currentPos) ?: return null
             wordText += tile.letter
-            wordTiles.add(Position(row, startPos.col) to tile)
+            wordTiles.add(currentPos to tile)
         }
 
         return FoundWord(wordText, wordTiles, Direction.VERTICAL)
     }
 
-
-    /**
-     * La fonction principale qui, pour un coup (un ensemble de tuiles posées),
-     * trouve TOUS les mots formés.
-     */
     fun findAllWordsFormedByMove(board: Board, placedTiles: Map<Position, Tile>): Set<FoundWord> {
-        val allWords = mutableSetOf<FoundWord>()
         if (placedTiles.isEmpty()) return emptySet()
 
-        // Logique pour déterminer la direction principale du coup (horizontal ou vertical)
-        // ...
+        val allFoundWords = mutableSetOf<FoundWord>()
 
-        // Pour chaque tuile posée...
-        placedTiles.keys.forEach { pos ->
-            // ... on trouve le mot horizontal et le mot vertical qui la traversent
-            findHorizontalWord(board, pos)?.let {
-                println("WordFinder : Mot horizontal trouvé : ${it.text}")
-                allWords.add(it) }
-            findVerticalWord(board, pos)?.let {
-                println("WordFinder : Mot vertical trouvé : ${it.text}")
-                allWords.add(it) }
+        // Pour chaque tuile qui vient d'être posée...
+        placedTiles.keys.forEach { position ->
+            // ...on cherche le mot horizontal qui la contient...
+            findHorizontalWord(board, position)?.let { allFoundWords.add(it) }
+            // ...et on cherche le mot vertical qui la contient.
+            findVerticalWord(board, position)?.let { allFoundWords.add(it) }
         }
 
-        return allWords
+        // Cette logique est une sécurité supplémentaire si un mot d'une seule lettre a été joué,
+        // mais qu'il est connecté à d'autres, formant un mot plus long.
+        // Si aucun mot n'est trouvé alors qu'on a posé des tuiles, c'est qu'on a peut-être formé
+        // un mot à partir d'une seule tuile posée. La boucle ci-dessus suffit normalement.
+        // On peut simplifier : si la boucle trouve des mots, c'est bon.
+
+        return allFoundWords
     }
 }
-
-
-

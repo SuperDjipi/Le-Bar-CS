@@ -3,8 +3,8 @@ package club.djipi.lebarcs.data.repository
 import club.djipi.lebarcs.data.local.dao.GameDao
 import club.djipi.lebarcs.data.local.dao.PlayerDao
 import club.djipi.lebarcs.data.remote.WebSocketClient
-import club.djipi.lebarcs.domain.model.Game
-import club.djipi.lebarcs.domain.model.Move
+import club.djipi.lebarcs.shared.domain.model.GameState
+import club.djipi.lebarcs.shared.domain.model.Move
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -13,7 +13,7 @@ interface GameRepository {
     suspend fun createGame(): String
     suspend fun joinGame(gameId: String, playerId: String)
     suspend fun checkGameExists(gameId: String): Boolean
-    fun observeGame(gameId: String): Flow<Game?>
+    fun observeGame(gameId: String): Flow<GameState?>
     suspend fun playMove(gameId: String, move: Move)
     suspend fun disconnect()
 }
@@ -40,7 +40,7 @@ class GameRepositoryImpl @Inject constructor(
         return true
     }
     
-    override fun observeGame(gameId: String): Flow<Game?> {
+    override fun observeGame(gameId: String): Flow<GameState?> {
         // Combiner les données locales et les mises à jour WebSocket
         return gameDao.getGame(gameId).map { entity ->
             // TODO: Convertir GameEntity en Game
@@ -55,6 +55,6 @@ class GameRepositoryImpl @Inject constructor(
     }
     
     override suspend fun disconnect() {
-        webSocketClient.disconnect()
+        webSocketClient.close()
     }
 }

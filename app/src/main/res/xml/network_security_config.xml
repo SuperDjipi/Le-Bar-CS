@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Autorise le trafic en texte clair pour le développement local -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- L'adresse de l'hôte pour l'émulateur Android -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- Vous pouvez ajouter ici l'IP de votre machine pour les tests sur appareil physique -->
+        <!-- <domain includeSubdomains="true">192.168.1.45</domain> -->
+    </domain-config>
+</network-security-config>
+    

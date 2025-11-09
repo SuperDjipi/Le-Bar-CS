@@ -48,43 +48,21 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun joinGame() {
         val gameId = _uiState.value.gameIdInput
         if (gameId.isBlank()) return
-        
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            
-            try {
-                // Vérifier que la partie existe
-                val exists = gameRepository.checkGameExists(gameId)
-                if (exists) {
-                    _uiState.update { 
-                        it.copy(
-                            isLoading = false,
-                            createdGameId = gameId
-                        )
-                    }
-                } else {
-                    _uiState.update { 
-                        it.copy(
-                            isLoading = false,
-                            error = "Partie introuvable"
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                _uiState.update { 
-                    it.copy(
-                        isLoading = false,
-                        error = "Erreur: ${e.message}"
-                    )
-                }
-            }
+
+        // On met simplement à jour l'état pour que le LaunchedEffect déclenche la navigation.
+        _uiState.update {
+            it.copy(
+                // On ne gère plus isLoading ici, c'est le LobbyScreen qui s'en chargera.
+                isLoading = false,
+                createdGameId = gameId
+            )
         }
     }
-    
+
     fun onGameIdChanged(newValue: String) {
         _uiState.update { it.copy(gameIdInput = newValue.uppercase()) }
     }

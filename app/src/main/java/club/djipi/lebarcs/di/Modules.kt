@@ -17,6 +17,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.*
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.engine.android.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -71,7 +72,7 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideHttpClient(json: Json): HttpClient {
-        return HttpClient(Android) {
+        return HttpClient(OkHttp) {
             install(WebSockets)
             
             install(ContentNegotiation) {
@@ -83,15 +84,6 @@ object NetworkModule {
                 level = LogLevel.INFO
             }
         }
-    }
-    
-    @Provides
-    @Singleton
-    fun provideWebSocketClient(
-        httpClient: HttpClient,
-        json: Json
-    ): WebSocketClient {
-        return WebSocketClient(httpClient, json)
     }
 }
 

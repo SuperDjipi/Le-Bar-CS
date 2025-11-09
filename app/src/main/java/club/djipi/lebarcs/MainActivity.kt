@@ -25,35 +25,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-//
-//        setContent {
-//            ScrabbleTheme {
-//                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-//                    NavGraph(modifier = Modifier.padding(innerPadding))
-//                }
-//            }
         setContent {
             LeBarCSTheme {
                     NavGraph()
 
             }
-        }
-    }
-}
-@Composable
-fun HelloScrabbleApp() {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Hello, LeBarCS App !",
-                style = MaterialTheme.typography.headlineLarge
-            )
         }
     }
 }

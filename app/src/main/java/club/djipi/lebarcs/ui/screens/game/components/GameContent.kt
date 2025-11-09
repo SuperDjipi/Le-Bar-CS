@@ -20,8 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import club.djipi.lebarcs.shared.domain.model.GameState
 import club.djipi.lebarcs.shared.domain.model.Position
-import club.djipi.lebarcs.ui.screens.game.GameData
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DragDropManager
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DragSource
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DropTarget
@@ -30,7 +30,7 @@ private const val TAG = "GameContent"
 
 @Composable
 fun GameContent(
-    gameData: GameData,
+    gameData: GameState,
     selectedTileIndex: Int?,
     dragDropManager: DragDropManager,
     onTileSelected: (Int) -> Unit,

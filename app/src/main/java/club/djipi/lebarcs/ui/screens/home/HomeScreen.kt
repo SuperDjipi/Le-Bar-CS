@@ -12,7 +12,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun HomeScreen(
     onNavigateToLobby: (String) -> Unit,
-    onNavigateToTestUI: () -> Unit = {},  // ← AJOUTÉ
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -64,23 +63,15 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { viewModel.joinGame() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            enabled = !uiState.isLoading && uiState.gameIdInput.isNotBlank()
+            // On appelle directement la navigation, c'est plus simple.
+            onClick = { onNavigateToLobby(uiState.gameIdInput) },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            // L'état 'enabled' ne dépend que de l'input de l'utilisateur.
+            enabled = uiState.gameIdInput.isNotBlank()
         ) {
             Text("Rejoindre une partie")
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedButton(
-            onClick = { onNavigateToTestUI() },  // ← Nouveau callback
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("🎨 Tester l'interface")
-        }
         // Afficher les erreurs
         uiState.error?.let { error ->
             Spacer(modifier = Modifier.height(16.dp))

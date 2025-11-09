@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import club.djipi.lebarcs.domain.model.Player
+import club.djipi.lebarcs.shared.domain.model.Player
 import club.djipi.lebarcs.ui.theme.LeBarCSTheme
 
 /**

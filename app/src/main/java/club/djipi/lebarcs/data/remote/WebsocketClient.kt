@@ -1,118 +1,91 @@
 package club.djipi.lebarcs.data.remote
 
-import androidx.navigation.safe.args.generator.ErrorMessage
-import club.djipi.lebarcs.shared.dto.GameStateDto
-import club.djipi.lebarcs.shared.dto.GameStateUpdate
-import club.djipi.lebarcs.shared.dto.PlayerJoined
-import club.djipi.lebarcs.shared.dto.ServerEvent
+import androidx.activity.result.launch
+import club.djipi.lebarcs.shared.network.ClientToServerEvent
+import club.djipi.lebarcs.shared.network.ServerToClientEvent
 import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
+import io.ktor.client.request.*
+import io.ktor.serialization.deserialize
+import io.ktor.serialization.kotlinx.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class WebSocketClient @Inject constructor(
-    private val client: HttpClient,
-    private val json: Json
+
+    // On s'assure d'avoir une instance de Json disponible dans la classe
+    private val httpClient: HttpClient,
+    private val json: Json,
+private val serverUrl: String
 ) {
     private var session: DefaultClientWebSocketSession? = null
-    private val _gameState = MutableStateFlow<GameStateDto?>(null)
-    val gameState: StateFlow<GameStateDto?> = _gameState.asStateFlow()
-    
-    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
-    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
-    
-    suspend fun connect(serverUrl: String, gameId: String) {
+
+    suspend fun connect(gameId: String): Flow<ServerToClientEvent> {
         try {
-            _connectionState.value = ConnectionState.CONNECTING
-            
-            session = client.webSocketSession("$serverUrl/game/$gameId")
-            
-            _connectionState.value = ConnectionState.CONNECTED
-            
-            // Écouter les messages entrants
-            session?.let { session ->
-                while (session.isActive) {
-                    when (val frame = session.incoming.receive()) {
-                        is Frame.Text -> {
-                            val text = frame.readText()
-                            handleMessage(text)
+            session = httpClient.webSocketSession {
+                url("ws://10.0.2.2:8080/ws/$gameId")
+            }
+            return session!!.incoming
+                .consumeAsFlow()
+                // On utilise mapNotNull pour filtrer automatiquement les résultats nuls
+                .map { frame ->
+                    // On ne traite que les trames de type Texte
+                    if (frame is Frame.Text) {
+                        try {
+                            // On désérialise la chaîne de caractères en objet ServerToClientEvent
+                            json.decodeFromString<ServerToClientEvent>(frame.readText())
+                        } catch (e: Exception) {// Si la désérialisation échoue, on logue l'erreur et on retourne null
+                            e.printStackTrace()
+                            null
                         }
-                        else -> {}
+                    } else {
+                        null
+                        // Si ce n'est pas une trame de texte, on l'ignore (retourne null)                        null
                     }
                 }
-            }
+                .filterNotNull()
+
         } catch (e: Exception) {
-            _connectionState.value = ConnectionState.ERROR
             e.printStackTrace()
-        } finally {
-            _connectionState.value = ConnectionState.DISCONNECTED
+            throw e
         }
     }
-    
-    private fun handleMessage(text: String) {
+
+    suspend fun sendEvent(event: ClientToServerEvent) {
         try {
-//            val message = json.decodeFromString<MessageDto>(text)
-//            when (message.type) {
-//                "GAME_STATE" -> {
-//                    message.gameState?.let { _gameState.value = it }
-//                }
-//                "PLAYER_JOINED" -> {
-//                    // Gérer l'arrivée d'un joueur
-//                }
-//                "MOVE_PLAYED" -> {
-//                    // Gérer un coup joué
-//                }
-//                "GAME_ENDED" -> {
-//                    // Gérer la fin de partie
-//                }
-//            }
-            // La magie opère ici : on décode directement dans la classe scellée
-            when (val event = json.decodeFromString<ServerEvent>(text)) {
-
-                is GameStateUpdate -> {
-                    // Le compilateur sait que 'event' est de type GameStateUpdate
-                    // 'event.gameState' est garanti non-null ici !
-                    _gameState.value = event.gameState
-                }
-
-                is PlayerJoined -> {
-                    // Le compilateur sait que 'event.player' existe et n'est pas null
-                    println("Un joueur a rejoint : ${event.player.name}")
-                    // Mettez à jour votre UI ou votre état local ici
-                }
-
-                is ErrorMessage -> {
-                    // Le compilateur sait que 'event.message' existe
-                    println("Erreur du serveur : ${event.message}")
-                }
-
-                // Ajoutez un 'is' pour chaque type d'événement
-                is club.djipi.lebarcs.shared.dto.ErrorMessage -> TODO()
-            }
+            val jsonString = json.encodeToString(event)
+            session?.send(Frame.Text(jsonString))
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-    
-    suspend fun sendMove(moveData: String) {
-        session?.send(Frame.Text(moveData))
-    }
-    
-    suspend fun disconnect() {
-        session?.close()
-        session = null
-        _connectionState.value = ConnectionState.DISCONNECTED
-    }
-}
 
-enum class ConnectionState {
-    DISCONNECTED,
-    CONNECTING,
-    CONNECTED,
-    ERROR
+    // --- DÉBUT DE L'AJOUT DE LA FONCTION MANQUANTE ---
+    /**
+     * Ferme la session WebSocket et le client Ktor pour libérer les ressources.
+     * C'est une fonction normale (non suspend) pour pouvoir être appelée depuis onCleared() du ViewModel.
+     */
+    fun close() {
+        // La fermeture de la session peut prendre du temps, on la lance dans une coroutine
+        // pour ne pas bloquer le thread principal, mais on n'a pas besoin d'attendre la fin.
+        // Un scope simple est suffisant ici.
+        CoroutineScope(Dispatchers.IO).launch {
+            session?.close()
+        }
+        httpClient.close()
+        println("WebSocketClient fermé.")
+    }
 }
