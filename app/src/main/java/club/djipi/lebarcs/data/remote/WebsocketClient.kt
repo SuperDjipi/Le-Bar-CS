@@ -46,6 +46,7 @@ private val serverUrl: String
                     if (frame is Frame.Text) {
                         try {
                             // On désérialise la chaîne de caractères en objet ServerToClientEvent
+                            println(frame.readText())
                             json.decodeFromString<ServerToClientEvent>(frame.readText())
                         } catch (e: Exception) {// Si la désérialisation échoue, on logue l'erreur et on retourne null
                             e.printStackTrace()

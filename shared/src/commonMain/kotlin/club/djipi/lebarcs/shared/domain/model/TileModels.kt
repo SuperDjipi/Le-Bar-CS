@@ -1,8 +1,9 @@
 package club.djipi.lebarcs.shared.domain.model
 
 import club.djipi.lebarcs.shared.generateUUID
+import kotlinx.serialization.Serializable
 
-
+@Serializable
 data class PlacedTile(
     val tile: Tile,
     val position: Position
@@ -11,6 +12,7 @@ data class PlacedTile(
 /**
  * Tuile du jeu
  */
+@Serializable
 data class Tile(
     val id: String = generateUUID(),
     val letter: Char,       // 'A'-'Z' ou '_' pour joker

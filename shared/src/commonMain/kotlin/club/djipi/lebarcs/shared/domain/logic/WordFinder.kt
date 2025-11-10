@@ -4,8 +4,10 @@ import club.djipi.lebarcs.shared.domain.model.Board
 import club.djipi.lebarcs.shared.domain.model.Direction
 import club.djipi.lebarcs.shared.domain.model.Position
 import club.djipi.lebarcs.shared.domain.model.Tile
+import kotlinx.serialization.Serializable
 
 // Représente un mot trouvé sur le plateau (ne change pas)
+@Serializable
 data class FoundWord(
     val text: String,
     val tiles: List<Pair<Position, Tile>>, // Pour savoir quelles tuiles le composent

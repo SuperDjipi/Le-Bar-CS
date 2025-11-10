@@ -37,37 +37,6 @@ class GameViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
-    init {
-        loadMockGameData()
-    }
-
-    private fun loadMockGameData() {
-        val mockPlayers = listOf(
-            Player(
-                "1", "Vous", 42, listOf(
-                    Tile(letter = 'S', points = 1),
-                    Tile(letter = 'C', points = 3),
-                    Tile(letter = 'R', points = 1),
-                    Tile(letter = 'A', points = 1),
-                    Tile(letter = 'B', points = 3),
-                    Tile(letter = 'L', points = 1),
-                    Tile(letter = 'E', points = 1)
-                )
-            ),
-            Player("2", "Adversaire", 38, emptyList())
-        )
-
-        _uiState.value = GameUiState.Playing(
-            GameState(
-                id = "123",
-                players = mockPlayers,
-                board = Board(),
-                currentPlayerIndex = 0,
-                currentPlayerRack = mockPlayers[0].rack,
-            )
-        )
-    }
-
     fun onTileSelected(index: Int) {
         val currentState = _uiState.value
         if (currentState is GameUiState.Playing) {
@@ -404,12 +373,14 @@ class GameViewModel @Inject constructor(
 
     fun connectToGame(gameId: String) {
         viewModelScope.launch {
+            _uiState.value = GameUiState.Loading // On s'assure de montrer l'état de chargement
             try {
                 // On se connecte et on écoute le flux d'événements du serveur
                 webSocketClient.connect(gameId).collect { event ->
                     handleServerEvent(event)
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 _uiState.value = GameUiState.Error("Impossible de se connecter au serveur.")
             }
         }
@@ -421,12 +392,8 @@ class GameViewModel @Inject constructor(
             is ServerToClientEvent.GameStateUpdate -> {
                 // On met simplement à jour notre UI avec l'état officiel reçu.
                 _uiState.update {
-                    if (it is GameUiState.Playing) {
-                        it.copy(gameData = event.payload.gameState)
-                    } else {
-                        // C'est la première fois qu'on reçoit l'état, on passe à l'état Playing
-                        GameUiState.Playing(gameData = event.payload.gameState)
-                    }
+                    // C'est maintenant la SEULE façon pour l'état de passer à 'Playing'.
+                    GameUiState.Playing(gameData = event.payload.gameState)
                 }
             }
 

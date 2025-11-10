@@ -1,9 +1,12 @@
 package club.djipi.lebarcs.shared.domain.model
 
 
+import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 /**
  * Position sur le plateau (0-14 pour un plateau 15x15)
  */
+@Serializable
 data class Position(
     val row: Int,
     val col: Int
@@ -24,6 +27,7 @@ enum class BonusType {
 /**
  * Case du plateau
  */
+@Serializable
 data class BoardCell(
     val position: Position,
     val bonus: BonusType = BonusType.NONE,
@@ -34,7 +38,9 @@ data class BoardCell(
 /**
  * Plateau de jeu 15x15
  */
-data class Board(
+@Serializable
+@JvmInline
+value class Board(
     val cells: List<List<BoardCell>> = initializeBoard()
 ) {
     fun getTile(position: Position): Tile? {
@@ -47,7 +53,10 @@ data class Board(
 
     companion object {
         const val SIZE = 15
-
+        // On crée une fonction 'invoke' pour pouvoir faire Board() comme avant.
+        operator fun invoke(): Board {
+            return Board(initializeBoard())
+        }
         private fun initializeBoard(): List<List<BoardCell>> {
             return List(SIZE) { row ->
                 List(SIZE) { col ->
