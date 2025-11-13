@@ -1,5 +1,6 @@
 package club.djipi.lebarcs.ui.navigation
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -16,6 +17,10 @@ import club.djipi.lebarcs.ui.screens.game.GameViewModel
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
+    // La route du groupe de jeu. On lui passe le gameId
+    object GameFlow : Screen("game_flow/{gameId}") {
+        fun createRoute(gameId: String) = "game_flow/$gameId"
+    }
     object Lobby : Screen("lobby/{gameId}") {
         fun createRoute(gameId: String) = "lobby/$gameId"
     }
@@ -41,7 +46,7 @@ fun NavGraph(
         composable(Screen.Home.route) {
             HomeScreen(
                 onNavigateToLobby = { gameId ->
-                    navController.navigate(Screen.Lobby.createRoute(gameId))
+                    navController.navigate(Screen.GameFlow.createRoute(gameId))
                 }
             )
         }
@@ -50,17 +55,17 @@ fun NavGraph(
             // La destination de départ de ce sous-graphe est la route du Lobby
             startDestination = Screen.Lobby.route,
             // On donne un nom à ce "groupe" de routes
-            route = GAME_FLOW_ROUTE
+            route = Screen.GameFlow.route
         ) {
             // Définition de l'écran Lobby à l'intérieur du groupe
             composable(Screen.Lobby.route) { backStackEntry ->
-                val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                // 1. On récupère l'entrée de la pile de navigation pour la route du **groupe**.
-                val gameFlowBackStackEntry = remember(backStackEntry) {
-                    navController.getBackStackEntry(GAME_FLOW_ROUTE)
+                // --- ON RÉCUPÈRE LE gameId DEPUIS LE PARENT ---
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(Screen.GameFlow.route)
                 }
+                val gameId = parentEntry.arguments?.getString("gameId") ?: ""
                 // 2. On passe cette entrée à Hilt pour qu'il attache le ViewModel au bon scope.
-                val gameViewModel: GameViewModel = hiltViewModel(gameFlowBackStackEntry)
+                val gameViewModel: GameViewModel = hiltViewModel(parentEntry)
 
 
                 LobbyScreen(
@@ -68,10 +73,7 @@ fun NavGraph(
                     // On passe le ViewModel partagé à l'écran
                     viewModel = gameViewModel,
                     onNavigateToGame = {
-                        // La navigation vers l'écran de jeu reste la même
-                        navController.navigate(Screen.Game.createRoute(gameId)) {
-                            popUpTo(Screen.Home.route)
-                        }
+                        navController.navigate(Screen.Game.route)
                     },
                     onNavigateBack = {
                         navController.popBackStack()
@@ -81,17 +83,17 @@ fun NavGraph(
 
             // Définition de l'écran Game à l'intérieur du même groupe
             composable(Screen.Game.route) { backStackEntry ->
-                // On récupère LA MÊME instance du ViewModel partagé
-                val gameFlowBackStackEntry = remember(backStackEntry) {
-                    navController.getBackStackEntry(GAME_FLOW_ROUTE)
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(Screen.GameFlow.route)
                 }
-                val gameViewModel: GameViewModel = hiltViewModel(gameFlowBackStackEntry)
+                val gameViewModel: GameViewModel = hiltViewModel(parentEntry)
 
                 GameScreen(
                     // Le gameId n'est plus nécessaire car le ViewModel est déjà initialisé
                     viewModel = gameViewModel,
                     onNavigateBack = {
-                        navController.popBackStack(Screen.Home.route, inclusive = false)
+                        //navController.popBackStack(Screen.Home.route, inclusive = false)
+                        navController.popBackStack()
                     }
                 )
             }

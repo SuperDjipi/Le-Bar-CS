@@ -2,7 +2,7 @@ package club.djipi.lebarcs.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import club.djipi.lebarcs.data.repository.GameRepository
+import club.djipi.lebarcs.shared.domain.repository.GameRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

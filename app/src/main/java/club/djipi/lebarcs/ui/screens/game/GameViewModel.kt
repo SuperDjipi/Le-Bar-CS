@@ -2,6 +2,7 @@ package club.djipi.lebarcs.ui.screens.game
 
 import android.util.Log
 import androidx.activity.result.launch
+import androidx.compose.animation.core.copy
 import androidx.compose.ui.graphics.colorspace.connect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,12 +17,16 @@ import club.djipi.lebarcs.shared.domain.model.Board
 import club.djipi.lebarcs.shared.domain.model.GameState
 import club.djipi.lebarcs.shared.domain.model.Position
 import club.djipi.lebarcs.shared.domain.model.Tile
+import club.djipi.lebarcs.shared.domain.repository.GameRepository
+import club.djipi.lebarcs.shared.domain.usecase.CalculateScoreUseCase
+import club.djipi.lebarcs.shared.domain.usecase.ValidateMoveUseCase
 import club.djipi.lebarcs.shared.generateUUID
 import club.djipi.lebarcs.shared.network.ServerToClientEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -30,13 +35,22 @@ private const val TAG = "GameViewModel"
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    private val dictionary: Dictionary,
-    private val webSocketClient: WebSocketClient
+    private val gameRepository: GameRepository,
+    private val validateMoveUseCase: ValidateMoveUseCase,
+    private val calculateScoreUseCase: CalculateScoreUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
-
+    init {  // On lance une coroutine DÈS LA CRÉATION du ViewModel
+        //  Son seul rôle est d'écouter les événements en permanence.
+        Log.d(TAG, "Création du ViewModel (init)")
+        viewModelScope.launch {
+            gameRepository.getEvents().collect { event ->
+                handleServerEvent(event)
+            }
+        }
+    }
     fun onTileSelected(index: Int) {
         val currentState = _uiState.value
         if (currentState is GameUiState.Playing) {
@@ -85,7 +99,6 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    // NOUVELLE FONCTION pour Board -> Rack
     fun onTileReturnedToRack(fromPosition: Position) {
         _uiState.update { currentState ->
             if (currentState is GameUiState.Playing) {
@@ -114,7 +127,6 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    // NOUVELLE FONCTION pour Rack -> Rack
     fun onRackTilesReordered(fromIndex: Int, toIndex: Int) {
         _uiState.update { currentState ->
             if (currentState is GameUiState.Playing) {
@@ -176,69 +188,43 @@ class GameViewModel @Inject constructor(
         currentState: GameUiState.Playing,
         newBoard: Board,
         newPlacedTiles: List<PlacedTile>,
-        newRack: List<Tile> // On ajoute le nouveau rack en paramètre
+        newRack: List<Tile>
     ) {
-        val placedTilesMap = newPlacedTiles.associate { it.position to it.tile }
-        val originalBoard = currentState.gameData.board // On a besoin du plateau d'origine
-        // Si aucune tuile n'est posée, le coup est "vide" mais valide pour continuer.
-        if (newPlacedTiles.isEmpty()) {
-            _uiState.update {
-                currentState.copy(
-                    gameData = currentState.gameData.copy(
-                        board = newBoard,
-                        currentPlayerRack = newRack,
-                        placedTiles = emptyList(),
-                        foundWords = emptyList(),
-                        currentMoveScore = 0,
-                        isCurrentMoveValid = false // Un coup vide n'est pas jouable
-                    )
-                )
-            }
-            return
-        }    // 1. Validation de l'alignement et de la contiguïté
-        val isPlacementValid = MoveValidator.isPlacementValid(originalBoard, placedTilesMap.keys)
-
-        // 2. Validation des mots dans le dictionnaire
-        val foundWords = WordFinder.findAllWordsFormedByMove(newBoard, placedTilesMap)
-        val allWordsAreInDico =
-            foundWords.isNotEmpty() && foundWords.all { dictionary.isValid(it.text) }
-
-        // 3. Validation de la connexion au jeu existant
-        val isMoveConnected = MoveValidator.isMoveConnected(
-            board = originalBoard,
-            placedTiles = placedTilesMap.keys,
-            turnNumber = currentState.gameData.turnNumber // On utilise gameState
+        // Le ViewModel utilise les UseCases pour la logique métier complexe
+        val isMovePlayable = validateMoveUseCase(
+            originalBoard = currentState.gameData.board,
+            newBoard = newBoard,
+            placedTiles = newPlacedTiles,
+            turnNumber = currentState.gameData.turnNumber
         )
 
-        // Le coup est JOUABLE si TOUTES les conditions sont remplies
-        val isMovePlayable = isPlacementValid && allWordsAreInDico && isMoveConnected
-
-        var totalScore = 0
-        // On calcule le score seulement si le coup est potentiellement jouable.
-        if (isMovePlayable) {
-            foundWords.forEach { word ->
-                totalScore += ScoreCalculator.calculateScore(
-                    word,
-                    newBoard,
-                    placedTilesMap.keys.toList()
-                )
-            }
-            if (placedTilesMap.size == 7) {
-                totalScore += 50
-            }
+        // On recalcule les mots trouvés et le score
+        val foundWords = if (isMovePlayable) {
+            WordFinder.findAllWordsFormedByMove(newBoard, newPlacedTiles.associate { it.position to it.tile })
+        } else {
+            emptySet()
         }
+
+        val score = if (isMovePlayable) {
+            calculateScoreUseCase(foundWords, newBoard, newPlacedTiles.map { it.position })
+        } else {
+            0
+        }
+
         _uiState.update {
-            currentState.copy(
-                gameData = currentState.gameData.copy(
+            // 'it' est le 'currentState' (GameUiState.Playing)
+            (it as GameUiState.Playing).copy(
+                // On met à jour l'état permanent du jeu avec les nouvelles tuiles posées "visuellement"
+                gameData = it.gameData.copy(
                     board = newBoard,
                     currentPlayerRack = newRack,
-                    placedTiles = newPlacedTiles,
-                    foundWords = foundWords.toList(),
-                    currentMoveScore = totalScore,
-                    isPlacementValid = isPlacementValid,
-                    areWordsValid = allWordsAreInDico,
-                    isCurrentMoveValid = isMovePlayable
-                )
+                    placedTiles = newPlacedTiles // 'placedTiles' est bien une propriété du GameState partagé
+                ),
+
+                // On met à jour les informations TEMPORAIRES sur le coup en cours
+                foundWordsForCurrentMove = foundWords.toList(),
+                currentMoveScore = score,
+                isCurrentMoveValid = isMovePlayable
             )
         }
     }
@@ -302,65 +288,13 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    // --- Actions de l'utilisateur ---
     fun onPlayMove() {
-        _uiState.update { currentState ->
-            if (currentState is GameUiState.Playing && currentState.gameData.isCurrentMoveValid) {
-
-                val gameData = currentState.gameData
-                println("✅ Coup valide ! On joue le coup pour ${gameData.currentMoveScore} points.")
-
-                // --- DÉBUT DE LA LOGIQUE DE FIN DE TOUR ---
-
-                // 1. Mettre à jour le score du joueur actuel
-                val updatedPlayers = gameData.players.mapIndexed { index, player ->
-                    if (index == gameData.currentPlayerIndex) {
-                        player.copy(score = player.score + gameData.currentMoveScore)
-                    } else {
-                        player
-                    }
-                }
-
-                // 2. "Verrouiller" les tuiles. Le 'newBoard' est déjà correct car
-                //    il a été calculé par 'updateStateWithNewMove'. Les tuiles sont déjà en place.
-                //    On n'a rien de plus à faire sur le plateau lui-même.
-
-                // 3. Faire piocher de nouvelles tuiles
-                //    (Pour l'instant, la pioche est vide, mais on prépare la logique)
-                val tilesToDraw = 7 - gameData.currentPlayerRack.size
-                // val newTilesFromBag = tileBag.draw(tilesToDraw) // Logique future
-                // val newRackAfterDraw = gameData.currentPlayerRack + newTilesFromBag
-                // Pour l'instant, on garde le chevalet tel qu'il est après avoir posé les tuiles.
-                val finalRack = gameData.currentPlayerRack
-
-                // 4. Passer au joueur suivant
-                val nextPlayerIndex = (gameData.currentPlayerIndex + 1) % gameData.players.size
-
-                // 5. Préparer l'état pour le prochain tour
-                currentState.copy(
-                    gameData = gameData.copy(
-                        // L'état du jeu est mis à jour
-                        players = updatedPlayers,
-                        // Le plateau est déjà le bon
-                        turnNumber = gameData.turnNumber + 1,
-                        currentPlayerIndex = nextPlayerIndex,
-                        currentPlayerRack = finalRack, // Mettre à jour le chevalet avec les nouvelles tuiles piochées
-
-                        // On réinitialise l'état du coup en cours
-                        placedTiles = emptyList(),
-                        foundWords = emptyList(),
-                        currentMoveScore = 0,
-                        isPlacementValid = true,
-                        areWordsValid = true,
-                        isMoveConnected = true, // La connexion n'est pas pertinente pour un coup "vide"
-                        isCurrentMoveValid = false // Le prochain coup n'est pas encore valide
-                    )
-                )
-                // --- FIN DE LA LOGIQUE DE FIN DE TOUR ---
-
-            } else {
-                println("❌ Coup invalide, impossible de jouer.")
-                // Retourne l'état actuel sans changement si le coup n'est pas valide
-                currentState
+        viewModelScope.launch {
+            val currentState = uiState.value
+            if (currentState is GameUiState.Playing && currentState.isCurrentMoveValid) {
+                // Le ViewModel délègue l'envoi du coup au Repository
+                gameRepository.sendPlayMove(currentState.gameData.placedTiles)
             }
         }
     }
@@ -370,31 +304,22 @@ class GameViewModel @Inject constructor(
         // TODO: Passer le tour
     }
 
-
+    // --- Fonctions de communication ---
     fun connectToGame(gameId: String) {
-        viewModelScope.launch {
-            _uiState.value = GameUiState.Loading // On s'assure de montrer l'état de chargement
-            try {
-                // On se connecte et on écoute le flux d'événements du serveur
-                webSocketClient.connect(gameId).collect { event ->
-                    handleServerEvent(event)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _uiState.value = GameUiState.Error("Impossible de se connecter au serveur.")
-            }
-        }
+            // Cette fonction ne fait plus qu'une seule chose : déclencher.
+            // Elle n'est plus 'suspend', elle ne bloque pas.
+            _uiState.value = GameUiState.Loading
+            gameRepository.connect(gameId)
     }
 
     private fun handleServerEvent(event: ServerToClientEvent) {
+        Log.e("GameViewModel", "Event reçu : $event")
         when (event) {
+
             // Le serveur nous envoie le nouvel état du jeu !
             is ServerToClientEvent.GameStateUpdate -> {
-                // On met simplement à jour notre UI avec l'état officiel reçu.
-                _uiState.update {
-                    // C'est maintenant la SEULE façon pour l'état de passer à 'Playing'.
-                    GameUiState.Playing(gameData = event.payload.gameState)
-                }
+                Log.d("GameViewModel", "Nouvel état du jeu reçu : ${event.payload.gameState}")
+                _uiState.value = GameUiState.Playing(gameData = event.payload.gameState)
             }
 
             is ServerToClientEvent.ErrorMessage -> {
@@ -407,7 +332,7 @@ class GameViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        webSocketClient.close() // Très important de fermer la connexion
+        gameRepository.close() // Très important de fermer la connexion
     }
 
 

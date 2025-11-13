@@ -44,9 +44,9 @@ private val serverUrl: String
                 .map { frame ->
                     // On ne traite que les trames de type Texte
                     if (frame is Frame.Text) {
+                        println("WSClient : ${ frame.readText() }", )
                         try {
                             // On désérialise la chaîne de caractères en objet ServerToClientEvent
-                            println(frame.readText())
                             json.decodeFromString<ServerToClientEvent>(frame.readText())
                         } catch (e: Exception) {// Si la désérialisation échoue, on logue l'erreur et on retourne null
                             e.printStackTrace()
