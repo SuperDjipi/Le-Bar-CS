@@ -69,6 +69,7 @@ export interface GameState {
     id: string;
     board: Board;
     players: Player[];
+    tileBag: Tile[];
     moves: Move[];
     status: GameStatus;
 
