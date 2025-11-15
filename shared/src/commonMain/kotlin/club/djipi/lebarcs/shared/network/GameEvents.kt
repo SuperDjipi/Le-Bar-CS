@@ -10,6 +10,10 @@ import kotlinx.serialization.Serializable
  * Contient tous les événements que le CLIENT peut envoyer au SERVEUR.
  */
 @Serializable
+data class PlayMovePayload(
+    val placedTiles: List<PlacedTile>
+)
+@Serializable
 sealed class ClientToServerEvent {
     /** Le client demande à rejoindre une partie spécifique. */
     @Serializable
@@ -19,7 +23,7 @@ sealed class ClientToServerEvent {
     /** Le client propose de jouer un coup. */
     @Serializable
     @SerialName("PLAY_MOVE")
-    data class PlayMove(val placedTiles: List<PlacedTile>) : ClientToServerEvent()
+    data class PlayMove(val payload: PlayMovePayload) : ClientToServerEvent()
 }
 
 /**

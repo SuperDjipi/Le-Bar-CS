@@ -59,7 +59,8 @@ export enum Direction {
 export interface FoundWord {
     text: string;
     direction: Direction;
-    // On peut ajouter d'autres détails si besoin, comme les positions
+    tiles: { tile: Tile, position: Position }[];
+    start: Position;
 }
 
 

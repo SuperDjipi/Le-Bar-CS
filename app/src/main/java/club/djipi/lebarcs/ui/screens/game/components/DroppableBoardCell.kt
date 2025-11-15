@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -27,13 +28,13 @@ private const val TAG = "DroppableBoardCell"
 @Composable
 fun DroppableBoardCell(
     cell: BoardCell,
-    dragDropManager: DragDropManager,
+    dragDropManager: DragDropManager? = null,
     modifier: Modifier = Modifier,
     size: Dp = 35.dp,
-    onClick: () -> Unit = {}
+    content: @Composable BoxScope.() -> Unit
 ) {
     var cellPosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-    val dragState = dragDropManager.state
+    val dragState = dragDropManager!!.state
     val localDensity = LocalDensity.current
 
     // On crée UNE SEULE variable qui définit si la cellule est une cible de drop valide.
@@ -107,15 +108,15 @@ fun DroppableBoardCell(
                 size = size,
                 // On rend la tuile "draggable" pour permettre le déplacement depuis le plateau
                 dragDropManager = dragDropManager,
-                source = DragSource.Board(cell.position)
+                source = DragSource.Board(cell.position),
+                enabled = !cell.isLocked
             )
         } ?: run {
             // Le '?: run' est l'équivalent du 'else'. Il s'exécute si 'cell.tile' EST null.
             // S'il n'y a pas de tuile, on affiche la cellule de fond.
             BoardCellView(
                 cell = cell,
-                size = size,
-                onClick = onClick
+                size = size
             )
         }
     }

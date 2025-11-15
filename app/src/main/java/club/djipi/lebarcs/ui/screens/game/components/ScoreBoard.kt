@@ -1,16 +1,22 @@
 package club.djipi.lebarcs.ui.screens.game.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -18,103 +24,91 @@ import club.djipi.lebarcs.shared.domain.model.Player
 import club.djipi.lebarcs.ui.theme.LeBarCSTheme
 
 /**
- * Composant affichant les scores des joueurs
+ * Composant affichant les scores des joueurs de manière compacte.
  */
 @Composable
 fun ScoreBoard(
     players: List<Player>,
-    currentPlayerIndex: Int,
+    currentPlayerId: String, // ID du joueur dont c'est le tour
+    localPlayerId: String,   // ID du joueur qui utilise l'appareil
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
-            .border(2.dp, Color(0xFFCCCCCC), RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        // On espace les cartes de joueur uniformément
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "Scores",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
+        // On trie les joueurs pour que "moi" soit toujours en premier
+        val sortedPlayers = players.sortedByDescending { it.id == localPlayerId }
 
-        players.forEachIndexed { index, player ->
-            PlayerScoreRow(
+        sortedPlayers.forEach { player ->
+            // Le 'weight' permet aux cartes de partager l'espace disponible.
+            PlayerScoreCard(
                 player = player,
-                isCurrentPlayer = index == currentPlayerIndex,
-                rank = index + 1
+                isCurrentTurn = player.id == currentPlayerId,
+                isLocalPlayer = player.id == localPlayerId,
+                modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
 @Composable
-private fun PlayerScoreRow(
+private fun PlayerScoreCard(
     player: Player,
-    isCurrentPlayer: Boolean,
-    rank: Int,
+    isCurrentTurn: Boolean,
+    isLocalPlayer: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val backgroundColor = if (isCurrentPlayer) {
-        Color(0xFFFFE4B5)
-    } else {
-        Color.White
-    }
+    // Animation subtile de la couleur de la bordure
+    val borderColor by animateColorAsState(
+        targetValue = if (isCurrentTurn) MaterialTheme.colorScheme.primary else Color.LightGray,
+        animationSpec = tween(500)
+    )
 
-    Row(
+    Column(
         modifier = modifier
-            .fillMaxWidth()
-            .background(backgroundColor, RoundedCornerShape(4.dp))
             .border(
-                width = if (isCurrentPlayer) 2.dp else 1.dp,
-                color = if (isCurrentPlayer) Color(0xFFFF8C00) else Color(0xFFDDDDDD),
-                shape = RoundedCornerShape(4.dp)
+                width = if (isCurrentTurn) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(8.dp)
             )
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .background(
+                color = if (isLocalPlayer) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Rang
-            Text(
-                text = "#$rank",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF666666)
-            )
+        // Nom du joueur (tronqué si trop long)
+        Text(
+            text = if (isLocalPlayer) "Moi" else player.name,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
 
-            // Nom du joueur
-            Column {
-                Text(
-                    text = player.name,
-                    fontSize = 16.sp,
-                    fontWeight = if (isCurrentPlayer) FontWeight.Bold else FontWeight.Normal,
-                    color = Color.Black
-                )
-
-                if (isCurrentPlayer) {
-                    Text(
-                        text = "À votre tour !",
-                        fontSize = 12.sp,
-                        color = Color(0xFFFF8C00),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Score
         Text(
-            text = "${player.score} pts",
+            text = "${player.score}",
+            fontWeight = FontWeight.ExtraBold,
             fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Indicateur de tour : un petit point qui s'allume
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(if (isCurrentTurn) borderColor else Color.Transparent)
         )
     }
 }
@@ -130,7 +124,8 @@ fun ScoreBoardPreview() {
                 Player(id = "3", name = "Charlie", score = 98, rack = emptyList()),
                 Player(id = "4", name = "Diana", score = 87, rack = emptyList())
             ),
-            currentPlayerIndex = 0,
+            currentPlayerId = 3.toString(),
+            localPlayerId = 1.toString(),
             modifier = Modifier.padding(16.dp)
         )
     }

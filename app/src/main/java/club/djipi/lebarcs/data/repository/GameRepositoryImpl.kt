@@ -6,6 +6,7 @@ import club.djipi.lebarcs.data.remote.WebSocketClient
 import club.djipi.lebarcs.shared.domain.model.PlacedTile
 import club.djipi.lebarcs.shared.domain.repository.GameRepository
 import club.djipi.lebarcs.shared.network.ClientToServerEvent
+import club.djipi.lebarcs.shared.network.PlayMovePayload
 import club.djipi.lebarcs.shared.network.ServerToClientEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.asSharedFlow
@@ -40,7 +41,13 @@ class GameRepositoryImpl @Inject constructor(
     override fun getEvents(): Flow<ServerToClientEvent> = _events.asSharedFlow()
 
     override suspend fun sendPlayMove(placedTiles: List<PlacedTile>) {
-        webSocketClient.sendEvent(ClientToServerEvent.PlayMove(placedTiles))
+        val payload = PlayMovePayload( placedTiles )
+        // 2. On crée l'événement en lui passant le payload
+        val playMoveEvent = ClientToServerEvent.PlayMove(payload)
+        // 3. (Optionnel) On peut mettre l'UI dans un état d'attente.
+        // Par exemple, en désactivant les boutons en attendant la réponse du serveur.
+        // Cela évite que l'utilisateur ne clique partout.
+        webSocketClient.sendEvent(playMoveEvent)
     }
 
     override suspend fun createGame(): String {

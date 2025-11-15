@@ -1,11 +1,13 @@
 package club.djipi.lebarcs.shared.domain.model
 
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 /**
  * Position sur le plateau (0-14 pour un plateau 15x15)
  */
+@Immutable
 @Serializable
 data class Position(
     val row: Int,
@@ -27,6 +29,7 @@ enum class BonusType {
 /**
  * Case du plateau
  */
+@Immutable
 @Serializable
 data class BoardCell(
     val position: Position,
@@ -38,6 +41,7 @@ data class BoardCell(
 /**
  * Plateau de jeu 15x15
  */
+@Immutable
 @Serializable
 @JvmInline
 value class Board(
@@ -95,4 +99,26 @@ value class Board(
             }
         }
     }
+}
+/**
+ * Fonction d'extension pour créer une nouvelle version du plateau
+ * avec une liste de tuiles posées.
+ * C'est une fonction "pure", elle ne modifie pas le plateau original.
+ */
+fun Board.withTiles(placedTiles: List<PlacedTile>): Board {
+    // 1. On crée une copie mutable de la grille de cellules actuelle.
+    val newCells = this.cells.map { row -> row.toMutableList() }.toMutableList()
+
+    // 2. Pour chaque tuile à placer, on met à jour la cellule correspondante.
+    placedTiles.forEach { (tile, position) ->
+        // On s'assure de ne pas écrire en dehors du plateau
+        if (position.row in 0..<Board.SIZE && position.col in 0..<Board.SIZE) {
+            val currentCell = newCells[position.row][position.col]
+            // On crée une nouvelle cellule avec la tuile mise à jour
+            newCells[position.row][position.col] = currentCell.copy(tile = tile)
+        }
+    }
+
+    // 3. On crée et retourne un nouvel objet Board avec la grille de cellules mise à jour.
+    return Board(newCells)
 }

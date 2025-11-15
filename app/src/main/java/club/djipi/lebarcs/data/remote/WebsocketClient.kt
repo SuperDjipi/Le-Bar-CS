@@ -36,7 +36,7 @@ private val serverUrl: String
     suspend fun connect(gameId: String): Flow<ServerToClientEvent> {
         try {
             session = httpClient.webSocketSession {
-                url("ws://10.0.2.2:8080/ws/$gameId")
+                url("ws://100.117.44.105:8080/ws/$gameId")
             }
             return session!!.incoming
                 .consumeAsFlow()
@@ -68,13 +68,12 @@ private val serverUrl: String
     suspend fun sendEvent(event: ClientToServerEvent) {
         try {
             val jsonString = json.encodeToString(event)
+            println("WSClient : $jsonString")
             session?.send(Frame.Text(jsonString))
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-
-    // --- DÉBUT DE L'AJOUT DE LA FONCTION MANQUANTE ---
     /**
      * Ferme la session WebSocket et le client Ktor pour libérer les ressources.
      * C'est une fonction normale (non suspend) pour pouvoir être appelée depuis onCleared() du ViewModel.

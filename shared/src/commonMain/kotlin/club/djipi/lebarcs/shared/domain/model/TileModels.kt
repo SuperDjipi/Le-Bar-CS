@@ -1,8 +1,10 @@
 package club.djipi.lebarcs.shared.domain.model
 
+import androidx.compose.runtime.Immutable
 import club.djipi.lebarcs.shared.generateUUID
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class PlacedTile(
     val tile: Tile,
@@ -12,6 +14,7 @@ data class PlacedTile(
 /**
  * Tuile du jeu
  */
+@Immutable
 @Serializable
 data class Tile(
     val id: String = generateUUID(),

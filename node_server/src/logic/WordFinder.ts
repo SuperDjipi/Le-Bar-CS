@@ -35,13 +35,17 @@ export function findHorizontalWord(board: Board, startPos: Position): FoundWord 
 
     // 3. Construire le mot
     let wordText = "";
+    // On doit aussi garder une trace des tuiles et de la position de départ
+    const wordTiles: { tile: Tile, position: Position }[] = [];
+    const startOfWordPos: Position = { row, col: startIndex };
     for (let col = startIndex; col <= endIndex; col++) {
         const tile = getTile(board, { row, col });
         if (!tile) return null; // Sécurité
         wordText += tile.letter;
+        wordTiles.push({ tile, position: { row, col } });
     }
 
-    return { text: wordText, direction: Direction.HORIZONTAL };
+    return { text: wordText, tiles: wordTiles, direction: Direction.HORIZONTAL, start: startOfWordPos };
 }
 
 export function findVerticalWord(board: Board, startPos: Position): FoundWord | null {
@@ -69,13 +73,17 @@ export function findVerticalWord(board: Board, startPos: Position): FoundWord | 
 
     // 3. Construire le mot
     let wordText = "";
+    // On doit aussi garder une trace des tuiles et de la position de départ
+    const wordTiles: { tile: Tile, position: Position }[] = [];
+    const startOfWordPos: Position = { row: startIndex , col};
     for (let row = startIndex; row <= endIndex; row++) {
         const tile = getTile(board, { row, col });
         if (!tile) return null;
         wordText += tile.letter;
+        wordTiles.push({ tile, position: { row, col } });
     }
 
-    return { text: wordText, direction: Direction.VERTICAL };
+    return { text: wordText, tiles: wordTiles, direction: Direction.VERTICAL, start: startOfWordPos };
 }
 
 export function findAllWordsFormedByMove(board: Board, placedTiles: { position: Position, tile: Tile }[]): Set<FoundWord> {
@@ -83,21 +91,24 @@ export function findAllWordsFormedByMove(board: Board, placedTiles: { position: 
         return new Set();
     }
 
-    const allFoundWords = new Set<FoundWord>();
+    // On utilise une Map pour stocker les mots trouvés, avec une clé unique.
+    const foundWordsMap = new Map<string, FoundWord>();
 
     for (const placed of placedTiles) {
         const hWord = findHorizontalWord(board, placed.position);
         if (hWord) {
-            allFoundWords.add(hWord);
+            // On crée une clé unique : ex: "MOT_HORIZONTAL_7_5"
+            const key = `${hWord.text}_${hWord.direction}_${hWord.start.row}_${hWord.start.col}`;
+            foundWordsMap.set(key, hWord);
         }
 
         const vWord = findVerticalWord(board, placed.position);
         if (vWord) {
-            allFoundWords.add(vWord);
+            // Clé unique pour le mot vertical
+            const key = `${vWord.text}_${vWord.direction}_${vWord.start.row}_${vWord.start.col}`;
+            foundWordsMap.set(key, vWord);
         }
     }
-
-    // Convertir le Set en tableau et le re-convertir en Set pour éliminer les doublons par valeur
-    const uniqueWords = Array.from(allFoundWords).map(w => JSON.stringify(w));
-    return new Set(uniqueWords.map(s => JSON.parse(s)));
+    // On retourne un Set contenant uniquement les valeurs de la Map, ce qui garantit l'unicité.
+    return new Set(foundWordsMap.values());
 }

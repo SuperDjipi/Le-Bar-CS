@@ -33,8 +33,6 @@ fun GameContent(
     gameData: GameState,
     selectedTileIndex: Int?,
     dragDropManager: DragDropManager,
-    onTileSelected: (Int) -> Unit,
-    onCellClick: (Position) -> Unit,
     onTilePlacedFromRack: (rackIndex: Int, position: Position) -> Unit,
     onTileMovedOnBoard: (from: Position, to: Position) -> Unit,
     onTileReturnedToRack: (from: Position) -> Unit,
@@ -78,6 +76,20 @@ fun GameContent(
         }
     }
 
+    // On calcule la condition d'activation du bouton JOUER
+    // en utilisant les paramètres que le Composable a reçus.
+
+    // 1. Est-ce que le coup en cours est valide ?
+    val isMoveValid = gameData.isCurrentMoveValid
+
+    // 2. Est-ce que c'est le tour du joueur local ?
+    // Pour l'instant, on suppose que le joueur local est "player1".
+    val localPlayerId = "player1"
+    val currentPlayerId = gameData.players.getOrNull(gameData.currentPlayerIndex)?.id
+    val isLocalPlayerTurn = currentPlayerId == localPlayerId
+
+    // 3. Le bouton est actif si les deux conditions sont vraies.
+    val isPlayButtonEnabled = isMoveValid && isLocalPlayerTurn
     // Contenu principal
     Column(
         modifier = modifier
@@ -88,7 +100,8 @@ fun GameContent(
         // Scores
         ScoreBoard(
             players = gameData.players,
-            currentPlayerIndex = gameData.currentPlayerIndex,
+            currentPlayerId = gameData.players.getOrNull(gameData.currentPlayerIndex)?.id ?: "",
+            localPlayerId = "player1",
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -97,7 +110,6 @@ fun GameContent(
             board = gameData.board,
             cellSize = 30,
             dragDropManager = dragDropManager,
-            onCellClick = onCellClick,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -108,7 +120,6 @@ fun GameContent(
             tiles = gameData.currentPlayerRack,
             selectedIndex = selectedTileIndex,
             dragDropManager = dragDropManager,
-            onTileClick = onTileSelected,
             onTileDragStart = { index ->
                 println("Début du drag de la tuile à l'index $index")
             },
@@ -155,7 +166,7 @@ fun GameContent(
             Button(
                 onClick = onPlayMove,
                 modifier = Modifier.weight(1f),
-                enabled = gameData.isCurrentMoveValid
+                enabled = isPlayButtonEnabled
             ) {
                 Icon(Icons.Default.Done, "Jouer")
                 Text("${gameData.currentMoveScore}")

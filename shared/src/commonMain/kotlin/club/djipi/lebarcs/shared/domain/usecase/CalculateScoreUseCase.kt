@@ -13,14 +13,14 @@ class CalculateScoreUseCase {
         newlyPlacedPositions: List<Position>
     ): Int {
         if (foundWords.isEmpty()) return 0
-
-        var totalScore = 0
-        foundWords.forEach { word ->
-            totalScore += ScoreCalculator.calculateScore(word, newBoard, newlyPlacedPositions)
+        // On utilise la fonction 'sumOf' qui est plus concise et idiomatique en Kotlin.
+        val wordsScore = foundWords.sumOf { word ->
+            ScoreCalculator.calculateScore(word, newBoard, newlyPlacedPositions)
         }
+        // On gère le bonus si le joueur a posé 7 tuiles.
+        val scrabbleBonus = if (newlyPlacedPositions.size == 7) 50 else 0
+        // --- FIN DE LA FINALISATION ---
 
-        // TODO: Gérer le bonus de 50 points si 7 tuiles sont posées
-
-        return totalScore
+        return wordsScore + scrabbleBonus
     }
 }

@@ -58,7 +58,7 @@ fun TileView(
     var finalModifier = modifier
 
     // On ajoute la logique de drag SEULEMENT si les paramètres sont fournis
-    if (dragDropManager != null && source != null) {
+    if (dragDropManager != null && source != null && enabled) {
         finalModifier = finalModifier
             .onGloballyPositioned { coordinates ->
                 tileCoordinates = coordinates.positionInWindow()

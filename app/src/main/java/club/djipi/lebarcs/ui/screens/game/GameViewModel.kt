@@ -1,339 +1,256 @@
 package club.djipi.lebarcs.ui.screens.game
 
 import android.util.Log
-import androidx.activity.result.launch
 import androidx.compose.animation.core.copy
-import androidx.compose.ui.graphics.colorspace.connect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import club.djipi.lebarcs.data.remote.WebSocketClient
-import club.djipi.lebarcs.shared.domain.model.PlacedTile
-import club.djipi.lebarcs.shared.domain.model.Player
-import club.djipi.lebarcs.shared.domain.logic.Dictionary
-import club.djipi.lebarcs.shared.domain.logic.MoveValidator
-import club.djipi.lebarcs.shared.domain.logic.ScoreCalculator
-import club.djipi.lebarcs.shared.domain.logic.WordFinder
-import club.djipi.lebarcs.shared.domain.model.Board
-import club.djipi.lebarcs.shared.domain.model.GameState
-import club.djipi.lebarcs.shared.domain.model.Position
-import club.djipi.lebarcs.shared.domain.model.Tile
-import club.djipi.lebarcs.shared.domain.repository.GameRepository
-import club.djipi.lebarcs.shared.domain.usecase.CalculateScoreUseCase
-import club.djipi.lebarcs.shared.domain.usecase.ValidateMoveUseCase
-import club.djipi.lebarcs.shared.generateUUID
+import club.djipi.lebarcs.shared.domain.logic.*
+import club.djipi.lebarcs.shared.domain.model.*
+import club.djipi.lebarcs.shared.network.ClientToServerEvent
+import club.djipi.lebarcs.shared.network.PlayMovePayload
 import club.djipi.lebarcs.shared.network.ServerToClientEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val TAG = "GameViewModel"
+// On garde un UiState simple pour la clarté
+
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    private val gameRepository: GameRepository,
-    private val validateMoveUseCase: ValidateMoveUseCase,
-    private val calculateScoreUseCase: CalculateScoreUseCase
+    // Les seules dépendances dont on a VRAIMENT besoin
+    private val webSocketClient: WebSocketClient,
+    private val dictionary: Dictionary
 ) : ViewModel() {
 
+    private var officialGameState: GameState? = null
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
-    val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
-    init {  // On lance une coroutine DÈS LA CRÉATION du ViewModel
-        //  Son seul rôle est d'écouter les événements en permanence.
-        Log.d(TAG, "Création du ViewModel (init)")
+    val uiState = _uiState.asStateFlow()
+
+    fun connectToGame(gameId: String) {
         viewModelScope.launch {
-            gameRepository.getEvents().collect { event ->
-                handleServerEvent(event)
+            _uiState.value = GameUiState.Loading
+            try {
+                // On écoute les messages du serveur.
+                webSocketClient.connect(gameId).collect { event ->
+                    handleServerEvent(event)
+                }
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Erreur de connexion", e)
+                _uiState.value = GameUiState.Error("Connexion échouée")
             }
         }
     }
-    fun onTileSelected(index: Int) {
-        val currentState = _uiState.value
-        if (currentState is GameUiState.Playing) {
-            val newIndex = if (currentState.selectedTileIndex == index) null else index
-            _uiState.update { currentState.copy(selectedTileIndex = newIndex) }
+
+    private fun handleServerEvent(event: ServerToClientEvent) {
+        Log.d("GameViewModel", "Événement reçu du serveur: $event")
+        if (event is ServerToClientEvent.GameStateUpdate) {
+            val completeGameState = event.payload.gameState.copy(
+                currentPlayerRack = event.payload.playerRack
+            )
+            // On sauvegarde l'état officiel
+            officialGameState = completeGameState
+            _uiState.value = GameUiState.Playing(
+                gameData = completeGameState,
+                localPlayerId = "player1"
+                )
+            Log.d("GameViewModel", "État mis à jour avec le GameState du serveur.")
         }
     }
 
-    fun onCellClick(position: Position) {
-        println("Clicked on cell: $position")
-    }
+    // --- TOUTE LA LOGIQUE DE JEU EST MAINTENANT ICI, CLAIREMENT VISIBLE ---
 
-    fun onTilePlacedFromRack(rackIndex: Int, position: Position) {
+    fun onTilePlacedFromRack(rackIndex: Int, targetPosition: Position) {
         val currentState = _uiState.value
-        if (currentState is GameUiState.Playing) {
-            val tile = currentState.gameData.currentPlayerRack.getOrNull(rackIndex) ?: return
-            // 1. On prépare les données pour la mise à jour de l'état
-            val newPlacedTile = PlacedTile(tile, position)
-            val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
-            val newRack = currentState.gameData.currentPlayerRack.toMutableList()
-                .apply { removeAt(rackIndex) }
-            val newBoard = updateBoardWithTileFromRack(currentState.gameData.board, tile, position)
-            updateStateWithNewMove(currentState, newBoard, updatedPlacedTiles, newRack)
-        }
+        if (currentState !is GameUiState.Playing) return
+
+        // 1. Préparer les données
+        val tileToMove = currentState.gameData.currentPlayerRack.getOrNull(rackIndex) ?: return
+        val newRack =
+            currentState.gameData.currentPlayerRack.toMutableList().apply { removeAt(rackIndex) }
+        val newPlacedTile = PlacedTile(tileToMove, targetPosition)
+        val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
+        val newBoard = currentState.gameData.board.withTiles(updatedPlacedTiles)
+
+        // 2. Calculer le nouvel état
+        val newState = calculateNewUiState(currentState, newBoard, updatedPlacedTiles, newRack)
+
+        // 3. Mettre à jour l'UI
+        _uiState.value = newState
     }
 
+    // Ajoutez ici les autres fonctions d'interaction (onTileMovedOnBoard, onTileReturnedToRack)
+    // qui appelleront toutes la même fonction `calculateNewUiState`.
+
+    /**
+     * Le "cerveau" de la mise à jour de l'UI. Prend un état et retourne le nouvel état calculé.
+     */
+    private fun calculateNewUiState(
+        currentState: GameUiState.Playing,
+        newBoard: Board,
+        newPlacedTiles: List<PlacedTile>,
+        newRack: List<Tile>
+    ): GameUiState.Playing {
+        // Validation
+        val placedTilesMap = newPlacedTiles.associate { it.position to it.tile }
+        val isPlacementValid =
+            MoveValidator.isPlacementValid(currentState.gameData.board, placedTilesMap.keys)
+        val isMoveConnected = MoveValidator.isMoveConnected(
+            currentState.gameData.board,
+            placedTilesMap.keys,
+            currentState.gameData.turnNumber
+        )
+        val foundWords = WordFinder.findAllWordsFormedByMove(newBoard, placedTilesMap)
+        val allWordsAreInDico =
+            foundWords.isNotEmpty() && foundWords.all { dictionary.isValid(it.text) }
+
+        val isMoveValid = isPlacementValid && isMoveConnected && allWordsAreInDico
+
+        Log.d(
+            "GameViewModel_Logic",
+            "Validation: Placement=$isPlacementValid, Connexion=$isMoveConnected, Dico=$allWordsAreInDico -> Final=$isMoveValid"
+        )
+
+        // Calcul du score
+        val score = if (isMoveValid) {
+            val scrabbleBonus = if (newPlacedTiles.size == 7) 50 else 0
+            foundWords.sumOf { word ->
+                ScoreCalculator.calculateScore(word, newBoard, newPlacedTiles.map { it.position })
+            } + scrabbleBonus
+        } else {
+            0
+        }
+
+        Log.d("GameViewModel_Logic", "Mots trouvés: $foundWords, Score calculé: $score")
+
+        // Retourner le nouvel état complet
+        return currentState.copy(
+            gameData = currentState.gameData.copy(
+                board = newBoard,
+                currentPlayerRack = newRack,
+                placedTiles = newPlacedTiles,
+                currentMoveScore = score,
+                isCurrentMoveValid = isMoveValid
+            )
+        )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        webSocketClient.close()
+    }
     fun onTileMovedOnBoard(fromPosition: Position, toPosition: Position) {
         val currentState = _uiState.value
-        if (currentState is GameUiState.Playing) {
-            // Le déplacement d'une tuile ne change ni le rack, ni les tuiles posées dans le tour.
-            val updatedPlacedTiles = currentState.gameData.placedTiles.map {
-                if (it.position == fromPosition) {
-                    it.copy(position = toPosition) // On met juste à jour la position de la tuile déplacée
-                } else {
-                    it
-                }
-            }
-            val newBoard =
-                updateBoardWithTileFromBoard(currentState.gameData.board, fromPosition, toPosition)
-            updateStateWithNewMove(
-                currentState,
-                newBoard,
-                updatedPlacedTiles,
-                currentState.gameData.currentPlayerRack
-            )
-        }
+        if (currentState !is GameUiState.Playing) return
+
+        val tileToMove = currentState.gameData.placedTiles.find { it.position == fromPosition }?.tile ?: return
+
+        val intermediatePlacedTiles = currentState.gameData.placedTiles.filter { it.position != fromPosition }
+        val finalPlacedTiles = intermediatePlacedTiles + PlacedTile(tileToMove, toPosition)
+        if (officialGameState == null) return
+        val newBoard = officialGameState!!.board.withTiles(finalPlacedTiles)
+
+        _uiState.value = calculateNewUiState(
+            currentState = currentState,
+            newBoard = newBoard,
+            newPlacedTiles = finalPlacedTiles,
+            newRack = currentState.gameData.currentPlayerRack
+        )
     }
 
     fun onTileReturnedToRack(fromPosition: Position) {
-        _uiState.update { currentState ->
-            if (currentState is GameUiState.Playing) {
-                val board = currentState.gameData.board
-                val tileToReturn = board.cells[fromPosition.row][fromPosition.col].tile
-                    ?: return@update currentState
+        val currentState = _uiState.value
+        if (currentState !is GameUiState.Playing) return
 
-                // 1. Crée un nouveau plateau sans la tuile
-                val newBoard =
-                    updateBoardWithTileFromBoard(board, fromPosition, null) // 'null' pour effacer
+        val tileToReturn = currentState.gameData.placedTiles.find { it.position == fromPosition }?.tile ?: return
+        val newPlacedTiles = currentState.gameData.placedTiles.filter { it.position != fromPosition }
+        val newRack = currentState.gameData.currentPlayerRack + tileToReturn
+        if (officialGameState == null) return
+        val newBoard = officialGameState!!.board.withTiles(newPlacedTiles)
 
-                // 2. Crée un nouveau chevalet avec la tuile revenue
-                val newRack = currentState.gameData.currentPlayerRack + tileToReturn
 
-                // 3. Appelle la fonction de mise à jour commune
-                updateStateWithNewMove(
-                    currentState = currentState,
-                    newBoard = newBoard,
-                    newPlacedTiles = currentState.gameData.placedTiles.filter { it.position != fromPosition },
-                    newRack = newRack
-                )
-                currentState // Retourne l'état mis à jour via l'helper
-            } else {
-                currentState
-            }
-        }
+        _uiState.value = calculateNewUiState(
+            currentState = currentState,
+            newBoard = newBoard,
+            newPlacedTiles = newPlacedTiles,
+            newRack = newRack
+        )
     }
 
     fun onRackTilesReordered(fromIndex: Int, toIndex: Int) {
         _uiState.update { currentState ->
             if (currentState is GameUiState.Playing) {
-                val currentRack = currentState.gameData.currentPlayerRack.toMutableList()
-                if (fromIndex < 0 || fromIndex >= currentRack.size || toIndex < 0 || toIndex > currentRack.size) {
-                    return@update currentState // Sécurité pour éviter les crashs
+                val newRack = currentState.gameData.currentPlayerRack.toMutableList().apply {
+                    add(toIndex, removeAt(fromIndex))
                 }
-
-                // Réorganise la liste
-                val draggedTile = currentRack.removeAt(fromIndex)
-                currentRack.add(toIndex.coerceAtMost(currentRack.size), draggedTile)
-
-                // Pas besoin d'appeler l'helper de calcul de score, on met juste à jour le chevalet
-                currentState.copy(
-                    gameData = currentState.gameData.copy(currentPlayerRack = currentRack)
-                )
+                currentState.copy(gameData = currentState.gameData.copy(currentPlayerRack = newRack))
             } else {
                 currentState
             }
         }
     }
 
-    private fun updateBoardWithTileFromRack(board: Board, tile: Tile, position: Position): Board {
-        val newCells = board.cells.mapIndexed { rowIndex, row ->
-            row.mapIndexed { colIndex, cell ->
-                if (rowIndex == position.row && colIndex == position.col) {
-                    cell.copy(tile = tile, isLocked = false)
-                } else {
-                    cell
+    fun onPlayMove() {
+        viewModelScope.launch {
+            val currentState = uiState.value
+            if (currentState is GameUiState.Playing && currentState.gameData.isCurrentMoveValid) {
+                // TODO: Envoyer l'événement au serveur via le webSocketClient
+                Log.d("GameViewModel", "Bouton JOUER cliqué. Envoi du coup au serveur...")
+                try {
+                    //1. On crée d'abord le payload
+                    val payload = PlayMovePayload(
+                        placedTiles= currentState.gameData.placedTiles)
+                    // 2. On crée l'événement en lui passant le payload
+                    val playMoveEvent = ClientToServerEvent.PlayMove(payload)
+                    // 3. (Optionnel) On peut mettre l'UI dans un état d'attente.
+                    // Par exemple, en désactivant les boutons en attendant la réponse du serveur.
+                    // Cela évite que l'utilisateur ne clique partout.
+                    webSocketClient.sendEvent(playMoveEvent)
+
+
+                } catch (e: Exception) {
+                    Log.e("GameViewModel", "Erreur lors de l'envoi du coup", e)
+                    // Afficher une erreur à l'utilisateur si l'envoi échoue
                 }
             }
         }
-        return Board(newCells)
     }
 
-    private fun updateBoardWithTileFromBoard(
-        board: Board,
-        fromPosition: Position,
-        toPosition: Position?
-    ): Board {
-        val newCells = board.cells.mapIndexed { rowIndex, row ->
-            row.mapIndexed { colIndex, cell ->
-                if (rowIndex == fromPosition.row && colIndex == fromPosition.col) {
-                    cell.copy(tile = null, isLocked = false)
-                } else if (rowIndex == toPosition?.row && colIndex == toPosition.col) {
-                    cell.copy(
-                        tile = board.cells[fromPosition.row][fromPosition.col].tile,
-                        isLocked = false
-                    )
-                } else {
-                    cell
-                }
-            }
-        }
-        return Board(newCells)
-    }
-
-    private fun updateStateWithNewMove(
-        currentState: GameUiState.Playing,
-        newBoard: Board,
-        newPlacedTiles: List<PlacedTile>,
-        newRack: List<Tile>
-    ) {
-        // Le ViewModel utilise les UseCases pour la logique métier complexe
-        val isMovePlayable = validateMoveUseCase(
-            originalBoard = currentState.gameData.board,
-            newBoard = newBoard,
-            placedTiles = newPlacedTiles,
-            turnNumber = currentState.gameData.turnNumber
-        )
-
-        // On recalcule les mots trouvés et le score
-        val foundWords = if (isMovePlayable) {
-            WordFinder.findAllWordsFormedByMove(newBoard, newPlacedTiles.associate { it.position to it.tile })
-        } else {
-            emptySet()
-        }
-
-        val score = if (isMovePlayable) {
-            calculateScoreUseCase(foundWords, newBoard, newPlacedTiles.map { it.position })
-        } else {
-            0
-        }
-
-        _uiState.update {
-            // 'it' est le 'currentState' (GameUiState.Playing)
-            (it as GameUiState.Playing).copy(
-                // On met à jour l'état permanent du jeu avec les nouvelles tuiles posées "visuellement"
-                gameData = it.gameData.copy(
-                    board = newBoard,
-                    currentPlayerRack = newRack,
-                    placedTiles = newPlacedTiles // 'placedTiles' est bien une propriété du GameState partagé
-                ),
-
-                // On met à jour les informations TEMPORAIRES sur le coup en cours
-                foundWordsForCurrentMove = foundWords.toList(),
-                currentMoveScore = score,
-                isCurrentMoveValid = isMovePlayable
+    fun onUndoMove() {
+        // On vérifie que nous avons bien un état officiel à restaurer.
+        if (officialGameState != null) {
+            // La seule et unique action : on remplace l'état de l'UI
+            // par la dernière version propre que nous avons sauvegardée.
+            _uiState.value = GameUiState.Playing(
+                gameData = officialGameState!!,
+                localPlayerId = "player1"
             )
+            Log.d("GameViewModel", "Annulation : retour à l'état officiel du serveur.")
+        } else {
+            // Ce cas ne devrait pas arriver si on est dans l'état "Playing",
+            // mais c'est une sécurité.
+            Log.w("GameViewModel", "onUndoMove appelé mais aucun état officiel n'est disponible.")
         }
     }
 
     fun onShuffleRack() {
-        val currentState = _uiState.value
-        if (currentState is GameUiState.Playing) {
-            val shuffledRack = currentState.gameData.currentPlayerRack.shuffled()
-            _uiState.update {
-                currentState.copy(
-                    gameData = currentState.gameData.copy(currentPlayerRack = shuffledRack)
-                )
-            }
-        }
-    }
-
-    /** Annule le coup en cours en remettant toutes les tuiles posées
-     * sur le plateau dans le chevalet du joueur.
-     */
-    fun onUndoMove() {
         _uiState.update { currentState ->
             if (currentState is GameUiState.Playing) {
-                val gameData = currentState.gameData
-                if (gameData.placedTiles.isEmpty()) {
-                    // S'il n'y a aucune tuile à annuler, on ne fait rien.
-                    return@update currentState
-                }
-
-                // 1. On récupère les tuiles qui avaient été posées
-                val tilesToReturn = gameData.placedTiles.map { it.tile }
-
-                // 2. On recrée un chevalet avec les tuiles du chevalet actuel ET les tuiles retournées
-                val newRack = gameData.currentPlayerRack + tilesToReturn
-
-                // 3. On recrée un plateau propre, sans les tuiles qui venaient d'être posées.
-                // Pour cela, on part du plateau *d'origine* (avant le début du coup).
-                // Si on ne l'a pas, on peut le reconstruire en retirant les 'placedTiles'.
-                var newBoard = gameData.board
-                gameData.placedTiles.forEach { placedTile ->
-                    newBoard = updateBoardWithTileFromBoard(
-                        newBoard,
-                        placedTile.position,
-                        null
-                    ) // 'null' pour effacer
-                }
-
-                // 4. On réinitialise complètement l'état du coup en cours
-                currentState.copy(
-                    gameData = gameData.copy(
-                        board = newBoard,
-                        currentPlayerRack = newRack,
-                        placedTiles = emptyList(), // Le coup en cours est vide
-                        foundWords = emptyList(),
-                        currentMoveScore = 0,
-                        isCurrentMoveValid = false
-                    )
-                )
+                currentState.copy(gameData = currentState.gameData.copy(currentPlayerRack = currentState.gameData.currentPlayerRack.shuffled()))
             } else {
                 currentState
-            }
-        }
-    }
-
-    // --- Actions de l'utilisateur ---
-    fun onPlayMove() {
-        viewModelScope.launch {
-            val currentState = uiState.value
-            if (currentState is GameUiState.Playing && currentState.isCurrentMoveValid) {
-                // Le ViewModel délègue l'envoi du coup au Repository
-                gameRepository.sendPlayMove(currentState.gameData.placedTiles)
             }
         }
     }
 
     fun onPass() {
-        println("Passer le tour")
-        // TODO: Passer le tour
-    }
-
-    // --- Fonctions de communication ---
-    fun connectToGame(gameId: String) {
-            // Cette fonction ne fait plus qu'une seule chose : déclencher.
-            // Elle n'est plus 'suspend', elle ne bloque pas.
-            _uiState.value = GameUiState.Loading
-            gameRepository.connect(gameId)
-    }
-
-    private fun handleServerEvent(event: ServerToClientEvent) {
-        Log.e("GameViewModel", "Event reçu : $event")
-        when (event) {
-
-            // Le serveur nous envoie le nouvel état du jeu !
-            is ServerToClientEvent.GameStateUpdate -> {
-                Log.d("GameViewModel", "Nouvel état du jeu reçu : ${event.payload.gameState}")
-                _uiState.value = GameUiState.Playing(gameData = event.payload.gameState)
-            }
-
-            is ServerToClientEvent.ErrorMessage -> {
-                // Le serveur nous dit qu'on a fait une erreur
-                Log.e("GameViewModel", "Erreur du serveur : ${event.payload.message}")
-                // On pourrait afficher un Toast ou un Snackbar
-            }
+        viewModelScope.launch {
+            Log.d("GameViewModel", "Le joueur passe son tour. Envoi au serveur...")
+            // TODO: Envoyer un événement "PassTurn" au serveur
         }
     }
-
-    override fun onCleared() {
-        super.onCleared()
-        gameRepository.close() // Très important de fermer la connexion
-    }
-
-
 }

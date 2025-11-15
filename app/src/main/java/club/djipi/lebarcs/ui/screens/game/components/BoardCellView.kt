@@ -25,8 +25,7 @@ import club.djipi.lebarcs.ui.theme.*
 fun BoardCellView(
     cell: BoardCell,
     modifier: Modifier = Modifier,
-    size: Dp = 35.dp,
-    onClick: () -> Unit = {}
+    size: Dp = 35.dp
 ) {
     val (backgroundColor, text, textColor) = when (cell.bonus) {
         BonusType.NONE -> Triple(Color(0xFFE8DCC4), "", Color.Black)
