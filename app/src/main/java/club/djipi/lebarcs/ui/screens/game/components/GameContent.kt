@@ -31,6 +31,7 @@ private const val TAG = "GameContent"
 @Composable
 fun GameContent(
     gameData: GameState,
+    localPlayerId: String,
     selectedTileIndex: Int?,
     dragDropManager: DragDropManager,
     onTilePlacedFromRack: (rackIndex: Int, position: Position) -> Unit,
@@ -83,13 +84,10 @@ fun GameContent(
     val isMoveValid = gameData.isCurrentMoveValid
 
     // 2. Est-ce que c'est le tour du joueur local ?
-    // Pour l'instant, on suppose que le joueur local est "player1".
-    val localPlayerId = "player1"
     val currentPlayerId = gameData.players.getOrNull(gameData.currentPlayerIndex)?.id
-    val isLocalPlayerTurn = currentPlayerId == localPlayerId
+    val isLocalPlayerTurn = currentPlayerId == localPlayerId // Cette ligne fonctionne maintenant avec le vrai ID
 
-    // 3. Le bouton est actif si les deux conditions sont vraies.
-    val isPlayButtonEnabled = isMoveValid && isLocalPlayerTurn
+    val isPlayButtonEnabled = gameData.isCurrentMoveValid && isLocalPlayerTurn
     // Contenu principal
     Column(
         modifier = modifier
@@ -101,7 +99,7 @@ fun GameContent(
         ScoreBoard(
             players = gameData.players,
             currentPlayerId = gameData.players.getOrNull(gameData.currentPlayerIndex)?.id ?: "",
-            localPlayerId = "player1",
+            localPlayerId = localPlayerId,
             modifier = Modifier.fillMaxWidth()
         )
 

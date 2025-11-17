@@ -28,15 +28,14 @@ class WebSocketClient @Inject constructor(
 
     // On s'assure d'avoir une instance de Json disponible dans la classe
     private val httpClient: HttpClient,
-    private val json: Json,
-private val serverUrl: String
+    private val json: Json
 ) {
     private var session: DefaultClientWebSocketSession? = null
 
-    suspend fun connect(gameId: String): Flow<ServerToClientEvent> {
+    suspend fun connect(gameId: String, localPlayerId: String): Flow<ServerToClientEvent> {
         try {
             session = httpClient.webSocketSession {
-                url("ws://100.117.44.105:8080/ws/$gameId")
+                url("ws://100.117.44.105:8080/ws/$gameId?playerId=$localPlayerId")
             }
             return session!!.incoming
                 .consumeAsFlow()

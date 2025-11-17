@@ -9,6 +9,15 @@ import kotlinx.serialization.Serializable
 /**
  * Contient tous les événements que le CLIENT peut envoyer au SERVEUR.
  */
+/**
+ * Le payload pour l'événement d'inscription de profil.
+ * Contient les informations que le client envoie au serveur.
+ */
+@Serializable
+data class RegisterProfilePayload(
+    val name: String
+    // Plus tard, on pourra ajouter : val avatar: String, etc.
+)
 @Serializable
 data class PlayMovePayload(
     val placedTiles: List<PlacedTile>
@@ -24,6 +33,17 @@ sealed class ClientToServerEvent {
     @Serializable
     @SerialName("PLAY_MOVE")
     data class PlayMove(val payload: PlayMovePayload) : ClientToServerEvent()
+
+    /**
+     * Événement envoyé par le client pour enregistrer ou mettre à jour
+     * son profil sur le serveur.
+     */
+    @Serializable
+    @SerialName("REGISTER_PROFILE")
+    data class RegisterProfile(
+        val payload: RegisterProfilePayload
+    ) : ClientToServerEvent()
+    // ---------------------------------------------
 }
 
 /**

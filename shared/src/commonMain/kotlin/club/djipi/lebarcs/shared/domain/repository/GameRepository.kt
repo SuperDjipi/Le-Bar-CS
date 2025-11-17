@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 // Dans : shared/.../domain/repository/GameRepository.kt
 interface GameRepository {
-    fun connect(gameId: String)
+    fun connect(gameId: String, playerId: String)
     fun getEvents(): Flow<ServerToClientEvent> // Pour écouter les messages
     suspend fun sendPlayMove(placedTiles: List<PlacedTile>)
     suspend fun createGame(): String

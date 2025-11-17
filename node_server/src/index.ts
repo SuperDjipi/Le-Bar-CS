@@ -1,24 +1,57 @@
+/**
+ * Ce fichier est le point d'entrée principal et le cœur du serveur de jeu Node.js.
+ * Il est responsable de :
+ * 1. Démarrer un serveur web Express.
+ * 2. Lancer un serveur WebSocket par-dessus le serveur Express pour la communication en temps réel.
+ * 3. Gérer les connexions, déconnexions et messages des clients.
+ * 4. Maintenir l'état de toutes les parties en mémoire.
+ * 5. Agir comme un "contrôleur" qui reçoit les événements des clients et délègue la logique
+ *    de jeu au "moteur de jeu" (`GameEngine`).
+ */
+
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
+// Import des modèles de données et des types d'événements
 import type { ClientToServerEvent, ServerToClientEvent } from './models/GameEvents.js';
-import { findAllWordsFormedByMove } from './logic/WordFinder.js';
-import { isPlacementValid, isMoveConnected } from './logic/MoveValidator.js';
 import type { GameState, Tile, Player, PlacedTile } from './models/GameModels.js';
 import { GameStatus } from './models/GameModels.js';
+// Import des modules de logique métier
 import { createTileBag, drawTiles } from './logic/TileBag.js';
-import { calculateTotalScore } from './logic/ScoreCalculator.js';
 import { createEmptyBoard, createNewBoard } from './models/BoardModels.js';
-import { processPlayMove } from './logic/GameEngine.js';
+import { processPlayMove } from './logic/GameEngine.js'; // Le moteur de jeu principal
+import { URL } from 'url'; // Utile pour parser l'URL de connexion
+
+// Profil joueur
+interface UserProfile {
+    id: string; // C'est le playerId
+    name: string;
+    // avatarUrl: string; // Pour plus tard
+}
+const userProfiles = new Map<string, UserProfile>(); // Notre "base de données" d'utilisateurs
 
 
-import { isWordValid } from './logic/Dictionary.js';
+// --- GESTION DES PARTIES EN MÉMOIRE ---
 
-// --- Gestion des parties en mémoire ---
+/**
+ * La "base de données" en mémoire pour toutes les parties actives.
+ * C'est une Map qui associe un identifiant de partie (`gameId`) à son état complet (`GameState`).
+ * NOTE : Ces données sont volatiles et seront perdues si le serveur redémarre.
+ */
 const games = new Map<string, GameState>();
-// Associe un gameId à un Set de WebSockets (tous les joueurs de la partie)
-// IMPORTANT : Nous devons savoir quel joueur correspond à quelle connexion WebSocket.
-const connections = new Map<string, Map<string, WebSocket>>(); // gameId -> (playerId -> WebSocket)
 
+/**
+ * La gestion des connexions WebSocket actives.
+ * C'est une structure de données imbriquée :
+ * Map<gameId, Map<playerId, WebSocket>>
+ * - La clé externe est l'ID de la partie.
+ * - La valeur est une autre Map qui associe l'ID d'un joueur (`playerId`) à son instance WebSocket.
+ * Cela nous permet de savoir qui est qui et d'envoyer des messages ciblés.
+ */
+const connections = new Map<string, Map<string, WebSocket>>();
+
+/**
+ * Initialise le conteneur de connexions pour une partie donnée si ce n'est pas déjà fait.
+ */
 function initGameConnections(gameId: string) {
     if (!connections.has(gameId)) {
         connections.set(gameId, new Map<string, WebSocket>());
@@ -26,16 +59,14 @@ function initGameConnections(gameId: string) {
 }
 initGameConnections('123'); // Pour notre partie de test
 
-// --- Création d'une partie de test ---
+// --- CRÉATION D'UNE PARTIE DE TEST AU DÉMARRAGE ---
+// (Cette section est utile pour le développement, mais devrait être remplacée par une API de création de partie plus tard)
 function createTestGame(): GameState {
     let tileBag = createTileBag();
-
-    // Distribuer 7 tuiles au joueur 1
     const player1Draw = drawTiles(tileBag, 7);
-    const player1: Player = { id: 'player1', name: 'Joueur 1', score: 0, rack: player1Draw.drawnTiles, isActive: true };
+    const player1: Player = { id: 'a8040f2b-ba4b-44ed-889a-e9b27f118f32', name: '-Alpha', score: 0, rack: player1Draw.drawnTiles, isActive: true };
     tileBag = player1Draw.newBag;
 
-    // Distribuer 7 tuiles au joueur 2
     const player2Draw = drawTiles(tileBag, 7);
     const player2: Player = { id: 'player2', name: 'Joueur 2', score: 0, rack: player2Draw.drawnTiles, isActive: false };
     tileBag = player2Draw.newBag;
@@ -44,7 +75,7 @@ function createTestGame(): GameState {
         id: '123',
         board: createEmptyBoard(),
         players: [player1, player2],
-        tileBag: tileBag, // On stocke le reste de la pioche
+        tileBag: tileBag,
         moves: [],
         status: GameStatus.PLAYING,
         turnNumber: 1,
@@ -53,86 +84,98 @@ function createTestGame(): GameState {
 }
 games.set('123', createTestGame());
 console.log("- (Partie de test '123' créée.)");
-// --- Nouvelle fonction pour personnaliser l'état ---
-function prepareStateForPlayer(gameState: GameState, playerId: string
-): { stateForPlayer: GameState, playerRack: Tile[] } {
-    let playerRack: Tile[] = [];
 
-    // On crée une version du GameState où tous les chevalets sont vides...
+/**
+ * Prépare une version personnalisée du `GameState` pour un joueur spécifique.
+ * Cette fonction est cruciale pour la sécurité et la confidentialité :
+ * - Elle vide les chevalets (`rack`) de tous les autres joueurs.
+ * - Elle ne révèle pas le contenu de la pioche (`tileBag`).
+ * @param gameState L'état de jeu officiel et complet.
+ * @param playerId L'ID du joueur pour qui l'état est préparé.
+ * @returns Un objet contenant l'état "public" et le chevalet privé du joueur.
+ */
+function prepareStateForPlayer(gameState: GameState, playerId: string): { stateForPlayer: GameState, playerRack: Tile[] } {
+    let playerRack: Tile[] = [];
     const stateForPlayer: GameState = {
         ...gameState,
         players: gameState.players.map(p => {
             if (p.id === playerId) {
-                // ...sauf pour le joueur concerné, on garde son chevalet pour l'envoyer séparément.
                 playerRack = p.rack;
             }
             return { ...p, rack: [] }; // On vide le chevalet pour les autres
         }),
         tileBag: [] // On ne révèle jamais la pioche au client
     };
-
     return { stateForPlayer, playerRack };
 }
-// --- Démarrage du serveur ---
+
+// --- DÉMARRAGE DU SERVEUR ---
 const app = express();
 const port = 8080;
+// On lance le serveur HTTP Express...
 const server = app.listen(port, () => {
-    console.log(`✅ Serveur  démarré et à l'écoute sur http://localhost:${port}`);
+    console.log(`✅ Serveur démarré et à l'écoute sur http://localhost:${port}`);
 });
+// ...et on attache le serveur WebSocket à ce serveur HTTP.
 const wss = new WebSocketServer({ server });
 
-// --- Logique principale de connexion ---
+// --- LOGIQUE PRINCIPALE DE CONNEXION ---
+
+/**
+ * Ce bloc est exécuté à chaque fois qu'un nouveau client établit une connexion WebSocket.
+ */
 wss.on('connection', (ws, req) => {
-    const gameId = req.url?.split('/').pop();
-    if (!gameId || !games.has(gameId)) {
-        console.log(`❌ Tentative de connexion à une partie invalide: ${gameId}`);
+    // On parse l'URL pour extraire le gameId et le playerId
+    const requestUrl = new URL(req.url!, `http://${req.headers.host}`);
+    const gameId = requestUrl.pathname.split('/').pop()?.split('?')[0]; // Extrait l'ID de la partie de l'URL
+    const playerId = requestUrl.searchParams.get('playerId'); // Extrait l'ID du joueur des paramètres de l'URL
+
+    // Sécurité : on vérifie que les informations sont valides
+    if (!gameId || !playerId || !games.has(gameId)) {
+        console.log(`❌ Tentative de connexion invalide: gameId=${gameId}, playerId=${playerId}`);
         ws.close();
         return;
     }
+
     const gameConnections = connections.get(gameId)!;
 
-    // Pour les tests, on assigne un playerId basé sur l'ordre de connexion.
-    const playerId = `player${gameConnections.size + 1}`;
-    if (gameConnections.size >= games.get(gameId)!.players.length) {
-        console.log("Trop de joueurs, connexion refusée.");
-        ws.close();
-        return;
-    }
-    gameConnections.set(playerId, ws); // On associe le joueur à sa connexion    
+    // On associe l'instance WebSocket au joueur
+    gameConnections.set(playerId, ws);
     console.log(`Joueur ${playerId} vient de se connecter à la partie ${gameId}.`);
 
-    // Envoyer l'état actuel du jeu au joueur qui vient de se connecter
+    // --- ENVOI DE L'ÉTAT INITIAL ---
     const initialGameState = games.get(gameId)!;
-
-    // --- ON UTILISE NOTRE NOUVELLE FONCTION ---
     const { stateForPlayer, playerRack } = prepareStateForPlayer(initialGameState, playerId);
     const welcomeEvent: ServerToClientEvent = {
         type: "GAME_STATE_UPDATE",
         payload: {
             gameState: stateForPlayer,
-            playerRack: playerRack // On envoie le chevalet du joueur dans le champ dédié
+            playerRack: playerRack
         }
     };
     ws.send(JSON.stringify(welcomeEvent));
     console.log(`Envoyé l'état initial personnalisé pour ${playerId}.`);
 
+    /**
+     * Ce bloc est exécuté à chaque fois qu'un message est reçu de ce client spécifique.
+     */
     ws.on('message', (message) => {
         try {
             const event: ClientToServerEvent = JSON.parse(message.toString());
 
+            // Aiguillage des événements reçus du client
             if (event.type === "PLAY_MOVE") {
                 const currentGame = games.get(gameId)!;
                 const { placedTiles } = event.payload;
-                // --- On délègue TOUT le travail au moteur de jeu ---
+
+                // On délègue TOUTE la logique de traitement du coup au GameEngine.
                 const nextGameState = processPlayMove(currentGame, placedTiles);
 
                 if (nextGameState) {
-                    // Le coup était valide, le moteur a retourné le nouvel état.
+                    // Si le moteur retourne un nouvel état, le coup était valide.
+                    games.set(gameId, nextGameState); // Mise à jour de l'état maître.
 
-                    // On met à jour l'état officiel sur le serveur
-                    games.set(gameId, nextGameState);
-
-                    // On prépare et on diffuse le nouvel état à tous les joueurs
+                    // Diffusion (broadcast) de l'état mis à jour à tous les joueurs connectés.
                     console.log(`✅ Coup validé! Diffusion du nouvel état personnalisé.`);
                     nextGameState.players.forEach(player => {
                         const clientWs = gameConnections.get(player.id);
@@ -147,7 +190,7 @@ wss.on('connection', (ws, req) => {
                         }
                     });
                 } else {
-                    // Le coup était invalide, le moteur a retourné null.
+                    // Si le moteur retourne null, le coup était invalide.
                     console.log("❌ Coup invalide! Envoi d'un message d'erreur.");
                     const errorEvent: ServerToClientEvent = {
                         type: "ERROR",
@@ -156,14 +199,26 @@ wss.on('connection', (ws, req) => {
                     ws.send(JSON.stringify(errorEvent));
                 }
             }
-
+if (event.type === "REGISTER_PROFILE") {
+    const { name } = event.payload;
+    if (name) {
+        const newProfile: UserProfile = { id: playerId, name }; // 'playerId' vient de la connexion
+        userProfiles.set(playerId, newProfile);
+        console.log(`Profil enregistré/mis à jour pour ${playerId}: ${name}`);
+        // On peut renvoyer une confirmation au client
+    }
+}
+            // TODO: Ajouter ici le traitement des autres types d'événements (PASS_TURN, EXCHANGE_TILES...)
         } catch (error) {
             console.error("Erreur lors du traitement du message:", error);
         }
     });
 
+    /**
+     * Ce bloc est exécuté lorsque le client ferme sa connexion.
+     */
     ws.on('close', () => {
         console.log(`👋 Joueur ${playerId} déconnecté.`);
-        gameConnections.delete(playerId);
+        gameConnections.delete(playerId); // On le retire de la liste des connexions actives.
     });
 });

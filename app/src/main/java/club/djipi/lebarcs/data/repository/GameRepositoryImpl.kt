@@ -24,11 +24,11 @@ class GameRepositoryImpl @Inject constructor(
     // On stocke le flux d'événements
     private val _events = MutableSharedFlow<ServerToClientEvent>()
 
-    override fun connect(gameId: String) {
+    override fun connect(gameId: String, playerId: String) {
         // On lance l'écoute dans un scope externe pour qu'elle ne meure pas
         externalScope.launch {
             try {
-                webSocketClient.connect(gameId).collect { event ->
+                webSocketClient.connect(gameId, playerId).collect { event ->
                     _events.emit(event)
                 }
             } catch (e: Exception) {

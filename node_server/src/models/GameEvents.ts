@@ -16,11 +16,17 @@ export interface PlayMoveEvent {
         placedTiles: PlacedTile[];
     };
 }
+export interface RegisterProfileEvent {
+    type: "REGISTER_PROFILE";
+    payload: {
+        name: string;
+    };
+}
 
 // ... (on pourra ajouter PassTurnEvent, ShuffleEvent, etc. plus tard)
 
 // Un type qui représente tous les événements possibles venant du client
-export type ClientToServerEvent = JoinGameEvent | PlayMoveEvent;
+export type ClientToServerEvent = JoinGameEvent | PlayMoveEvent | RegisterProfileEvent;
 
 
 // --- Événements que le SERVEUR envoie au CLIENT ---

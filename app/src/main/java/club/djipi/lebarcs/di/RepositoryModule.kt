@@ -10,6 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
+// Dans : app/src/main/java/club/djipi/lebarcs/di/RepositoryModule.kt
 @Module
 @InstallIn(SingletonComponent::class)
 object RepositoryModule {
@@ -17,7 +18,7 @@ object RepositoryModule {
     @Provides
     @Singleton
     fun provideGameRepository(
-        // Le Repository n'a besoin QUE de ces deux dépendances
+        // Le Repository a besoin de ces dépendances pour fonctionner
         webSocketClient: WebSocketClient,
         @ApplicationScope externalScope: CoroutineScope
     ): GameRepository {
