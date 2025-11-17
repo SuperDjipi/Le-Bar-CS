@@ -68,7 +68,7 @@ function createTestGame(): GameState {
     tileBag = player1Draw.newBag;
 
     const player2Draw = drawTiles(tileBag, 7);
-    const player2: Player = { id: 'player2', name: 'Joueur 2', score: 0, rack: player2Draw.drawnTiles, isActive: false };
+    const player2: Player = { id: '95728c79-d5a8-4561-8791-278af48cbb59', name: '-Djipi', score: 0, rack: player2Draw.drawnTiles, isActive: false };
     tileBag = player2Draw.newBag;
 
     return {

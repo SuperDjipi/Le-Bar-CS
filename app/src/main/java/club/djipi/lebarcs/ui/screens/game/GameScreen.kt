@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import club.djipi.lebarcs.ui.screens.game.components.GameContent
 import club.djipi.lebarcs.ui.screens.game.components.TileView
 import club.djipi.lebarcs.ui.screens.game.dragdrop.ProvideDragDropManager
+import kotlin.text.toInt
 
 /**
  * Le `Composable` principal pour l'écran de jeu.
@@ -46,118 +47,149 @@ fun GameScreen(
     // ProvideDragDropManager est un Composable qui crée une instance de DragDropManager
     // et la rend disponible à tous ses enfants via un CompositionLocal.
     // C'est le "père" de tout notre système de Drag & Drop pour cet écran.
-    ProvideDragDropManager { dragDropManager ->
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Partie en cours") },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, "Retour")
-                        }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Partie en cours") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, "Retour")
                     }
+                }
+            )
+        }
+    ) { paddingValues ->
+        // --- AIGUILLAGE DE L'UI EN FONCTION DE L'ÉTAT ---
+        // Le 'when' est le cœur de l'affichage réactif. Il garantit que l'UI
+        // correspond toujours à l'état actuel du ViewModel.
+        when (val state = uiState) {
+            is GameUiState.Loading -> {
+                // Si l'état est "Loading", on affiche une simple roue de chargement.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            is GameUiState.Playing -> {
+                GameLayout(
+                    state = state,
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(paddingValues)
                 )
             }
-        ) { paddingValues ->
-            // --- AIGUILLAGE DE L'UI EN FONCTION DE L'ÉTAT ---
-            // Le 'when' est le cœur de l'affichage réactif. Il garantit que l'UI
-            // correspond toujours à l'état actuel du ViewModel.
-            when (val state = uiState) {
-                is GameUiState.Loading -> {
-                    // Si l'état est "Loading", on affiche une simple roue de chargement.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
 
-                is GameUiState.Playing -> {
-                    // Si l'état est "Playing", on délègue l'affichage du jeu au GameContent.
-                    GameContent(
-                        gameData = state.gameData,
-                        localPlayerId = state.localPlayerId,
-                        selectedTileIndex = state.selectedTileIndex,
-                        // On passe le dragDropManager aux composants enfants qui en ont besoin.
-                        dragDropManager = dragDropManager,
-                        // On passe les fonctions du ViewModel comme des callbacks.
-                        // L'UI enfant appellera ces fonctions sans savoir ce qu'elles font.
-                        onTilePlacedFromRack = viewModel::onTilePlacedFromRack,
-                        onTileMovedOnBoard = viewModel::onTileMovedOnBoard,
-                        onTileReturnedToRack = viewModel::onTileReturnedToRack,
-                        onRackTilesReordered = viewModel::onRackTilesReordered,
-                        onPlayMove = viewModel::onPlayMove,
-                        onPass = viewModel::onPass,
-                        onUndoMove = viewModel::onUndoMove,
-                        onShuffleRack = viewModel::onShuffleRack,
-                        // On transmet le padding du Scaffold pour que le GameContent
-                        // ne soit pas caché par la barre de titre.
-                        modifier = Modifier.padding(paddingValues)
-                    )
-                }
-
-                is GameUiState.Error -> {
-                    // Si une erreur se produit, on affiche un message clair et un bouton pour quitter.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        contentAlignment = Alignment.Center
+            is GameUiState.Error -> {
+                // Si une erreur se produit, on affiche un message clair et un bouton pour quitter.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Text(
-                                text = "Erreur: ${state.message}",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Button(onClick = onNavigateBack) {
-                                Text("Retour")
-                            }
+                        Text(
+                            text = "Erreur: ${state.message}",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Button(onClick = onNavigateBack) {
+                            Text("Retour")
                         }
                     }
                 }
             }
         }
-        // --- AFFICHAGE DE L'OVERLAY DE DRAG ---
-        // Cet élément est un enfant direct de ProvideDragDropManager, mais il est déclaré
-        // APRÈS le Scaffold. Dans un Composable qui n'est pas un 'Row' ou 'Column',
-        // cela signifie qu'il sera dessiné PAR-DESSUS le Scaffold.
-        // C'est crucial pour que la tuile "flotte" au-dessus de toute l'UI.
-        if (dragDropManager.state.isDragging && dragDropManager.state.draggedTile != null) {
-            val state = dragDropManager.state
-            val tileSize = 60.dp
-            val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
+    }
 
-            // Ce Box prend tout l'écran, ce qui peut poser des problèmes de "vol de clics".
-            // Il est positionné de manière absolue par rapport à la fenêtre.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize() // Prend tout l'écran
-                    .offset {
-                        // On positionne la tuile flottante aux coordonnées du doigt.
-                        IntOffset(
-                            x = (state.currentCoordinates.x - tileSizePx / 2).toInt(),
-                            y = (state.currentCoordinates.y - tileSizePx / 2).toInt()
-                        )
-                    }
-            ) {
-                // On affiche la tuile en cours de déplacement avec un effet visuel
-                // (agrandie, transparente, avec une ombre) pour la distinguer.
-                TileView(
-                    tile = state.draggedTile!!,
-                    size = tileSize,
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = 1.3f
-                        scaleY = 1.3f
-                        shadowElevation = 16f
-                        alpha = 0.7f
-                    }
-                )
+}
+
+/**
+ * Nouveau Composable intermédiaire qui contient TOUT ce qui est lié au Drag & Drop.
+ */
+@Composable
+private fun GameLayout(
+    state: GameUiState.Playing,
+    viewModel: GameViewModel,
+    modifier: Modifier = Modifier
+) {
+    // 5. C'EST ICI que l'on fournit le DragDropManager.
+    //    Il n'a que deux enfants : GameContent et l'overlay de la tuile flottante.
+    ProvideDragDropManager { dragDropManager ->
+        // On utilise une Box pour superposer le jeu et l'overlay de la tuile.
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Le contenu du jeu (plateau, chevalet, etc.)
+            GameContent(
+                gameData = state.gameData,
+                localPlayerId = state.localPlayerId,
+                selectedTileIndex = state.selectedTileIndex,
+                // On passe le dragDropManager aux composants enfants qui en ont besoin.
+                dragDropManager = dragDropManager,
+                // On passe les fonctions du ViewModel comme des callbacks.
+                // L'UI enfant appellera ces fonctions sans savoir ce qu'elles font.
+                onTilePlacedFromRack = viewModel::onTilePlacedFromRack,
+                onTileMovedOnBoard = viewModel::onTileMovedOnBoard,
+                onTileReturnedToRack = viewModel::onTileReturnedToRack,
+                onRackTilesReordered = viewModel::onRackTilesReordered,
+                onPlayMove = viewModel::onPlayMove,
+                onPass = viewModel::onPass,
+                onUndoMove = viewModel::onUndoMove,
+                onShuffleRack = viewModel::onShuffleRack,
+                modifier = modifier
+            )
+
+            // --- AFFICHAGE DE L'OVERLAY DE DRAG ---
+            // Cet élément est un enfant direct de ProvideDragDropManager, mais il est déclaré
+            // APRÈS le Scaffold. Dans un Composable qui n'est pas un 'Row' ou 'Column',
+            // cela signifie qu'il sera dessiné PAR-DESSUS le Scaffold.
+            // C'est crucial pour que la tuile "flotte" au-dessus de toute l'UI.
+            if (dragDropManager.state.isDragging && dragDropManager.state.draggedTile != null) {
+                val dragState = dragDropManager.state
+                val tileSize = 60.dp
+                val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
+
+                // Ce Box prend tout l'écran, ce qui peut poser des problèmes de "vol de clics".
+                // Il est positionné de manière absolue par rapport à la fenêtre.
+//                Box(
+//                    modifier = Modifier
+//                        .fillMaxSize() // Prend tout l'écran
+//                        .offset {
+//                            // On positionne la tuile flottante aux coordonnées du doigt.
+//                            IntOffset(
+//                                x = (state.currentCoordinates.x - tileSizePx / 2).toInt(),
+//                                y = (state.currentCoordinates.y - tileSizePx / 2).toInt()
+//                            )
+//                        }
+//                ) {
+                    // On affiche la tuile en cours de déplacement avec un effet visuel
+                    // (agrandie, transparente, avec une ombre) pour la distinguer.
+                    TileView(
+                        tile = dragState.draggedTile!!,
+                        size = tileSize,
+                        modifier = Modifier
+                            // 1. On positionne la tuile avec offset
+                            .offset {
+                                IntOffset(
+                                    x = (dragState.currentCoordinates.x - tileSizePx / 2).toInt(),
+                                    y = (dragState.currentCoordinates.y - tileSizePx / 2).toInt()
+                                )
+                            }
+                            // 2. On applique les effets visuels
+                            .graphicsLayer {
+                            scaleX = 1.3f
+                            scaleY = 1.3f
+                            shadowElevation = 16f
+                            alpha = 0.7f
+                        }
+                    )
+                // du Box}
             }
         }
     }
