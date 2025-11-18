@@ -10,6 +10,8 @@ export interface Tile {
     id: string;
     letter: string; // En TypeScript, un 'char' est un 'string' de longueur 1
     points: number;
+    isJoker: boolean;
+    assignedLetter?: string | null;
 }
 
 // Équivalent de la data class PlacedTile

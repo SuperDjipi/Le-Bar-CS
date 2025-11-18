@@ -10,6 +10,17 @@ function getTile(board: Board, position: Position): Tile | null {
     return null;
 }
 
+/**
+ * Retourne la lettre à utiliser pour la validation d'un mot.
+ * Gère le cas du joker.
+ */
+function getDisplayLetter(tile: Tile): string {
+    // Si c'est un joker avec une lettre assignée, on utilise cette lettre.
+    // Sinon, on utilise la lettre de base de la tuile.
+    return tile.isJoker && tile.assignedLetter ? tile.assignedLetter : tile.letter;
+}
+// ----------------------------------------
+
 export function findHorizontalWord(board: Board, startPos: Position): FoundWord | null {
     if (getTile(board, startPos) === null) {
         return null;
@@ -41,7 +52,7 @@ export function findHorizontalWord(board: Board, startPos: Position): FoundWord 
     for (let col = startIndex; col <= endIndex; col++) {
         const tile = getTile(board, { row, col });
         if (!tile) return null; // Sécurité
-        wordText += tile.letter;
+        wordText += getDisplayLetter(tile);
         wordTiles.push({ tile, position: { row, col } });
     }
 
@@ -79,7 +90,7 @@ export function findVerticalWord(board: Board, startPos: Position): FoundWord | 
     for (let row = startIndex; row <= endIndex; row++) {
         const tile = getTile(board, { row, col });
         if (!tile) return null;
-        wordText += tile.letter;
+        wordText += getDisplayLetter(tile);
         wordTiles.push({ tile, position: { row, col } });
     }
 

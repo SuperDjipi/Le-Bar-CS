@@ -18,10 +18,21 @@ data class PlacedTile(
 @Serializable
 data class Tile(
     val id: String = generateUUID(),
-    val letter: Char,       // 'A'-'Z' ou '_' pour joker
+    val letter: String,       // 'A'-'Z' ou '_' pour joker
     val points: Int,        // Valeur en points
-    val isJoker: Boolean = false
+    val isJoker: Boolean = false,
+    val assignedLetter: String? = null
 ) {
+/**
+ * Une propriété calculée pour afficher la bonne lettre à l'écran.
+ *      * - Pour un joker assigné, affiche la lettre choisie (ex: "E").
+ *      * - Pour un joker non assigné, affiche la lettre de base (ex: "_").
+ *      * - Pour une tuile normale, affiche sa lettre (ex: "A").
+ */
+
+    val displayLetter: String
+        get() = if (isJoker && assignedLetter != null) assignedLetter else letter
+
     companion object {
         // Valeurs standard du Scrabble français
         val value = mapOf(

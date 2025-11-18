@@ -1,7 +1,6 @@
 package club.djipi.lebarcs.ui.screens.game
 
 import android.util.Log
-import androidx.compose.animation.core.copy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import club.djipi.lebarcs.data.local.UserPreferencesRepository
@@ -130,16 +129,27 @@ class GameViewModel @Inject constructor(
         val currentState = _uiState.value
         if (currentState !is GameUiState.Playing) return
 
-        //1. On prépare les nouvelles données (nouveau chevalet, nouvelle liste de tuiles posées).
+        var newState = currentState.copy()
         val tileToMove = currentState.gameData.currentPlayerRack.getOrNull(rackIndex) ?: return
-        val newRack = currentState.gameData.currentPlayerRack.toMutableList().apply { removeAt(rackIndex) }
-        val newPlacedTile = PlacedTile(tileToMove, targetPosition)
-        val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
-        val newBoard = officialGameState!!.board.withTiles(updatedPlacedTiles)
-
-        // 2. On délègue le calcul complexe à une fonction privée.
-        val newState = calculateNewUiState(currentState, newBoard, updatedPlacedTiles, newRack)
-
+        if (!tileToMove.isJoker) {
+            //1. On prépare les nouvelles données (nouveau chevalet, nouvelle liste de tuiles posées).
+            val newRack = currentState.gameData.currentPlayerRack.toMutableList()
+                .apply { removeAt(rackIndex) }
+            val newPlacedTile = PlacedTile(tileToMove, targetPosition)
+            val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
+            val newBoard = officialGameState!!.board.withTiles(updatedPlacedTiles)
+            // 2. On délègue le calcul complexe à une fonction privée.
+            newState = calculateNewUiState(currentState, newBoard, updatedPlacedTiles, newRack)
+        } else {
+            // C'est un joker ! On met à jour l'état pour déclencher le dialogue.
+            newState = currentState.copy(
+                jokerSelectionState = GameUiState.JokerSelectionState.Selecting(
+                    targetPosition = targetPosition,
+                    tileId = tileToMove.id
+                )
+            )
+            Log.d("GameViewModel", "Joker posé sur $targetPosition. En attente de la sélection de la lettre...")
+        }
         // 3. On applique le nouvel état calculé à l'UI.
         _uiState.value = newState
     }
@@ -334,4 +344,73 @@ class GameViewModel @Inject constructor(
         super.onCleared()
         webSocketClient.close()
     }
+
+/**
+ * Appelé quand l'utilisateur sélectionne une lettre pour le joker.
+ * Met à jour la tuile avec la lettre choisie et ferme le dialog.
+ */
+fun onJokerLetterSelected(letter: Char) {
+    val currentState = _uiState.value
+    if (currentState !is GameUiState.Playing) return
+
+    val selectionState = currentState.jokerSelectionState
+    if (selectionState !is GameUiState.JokerSelectionState.Selecting) return
+
+    // 1. On retrouve la tuile joker originale sur le chevalet grâce à son ID.
+    val jokerRackIndex = currentState.gameData.currentPlayerRack.indexOfFirst { it.id == selectionState.tileId }
+    if (jokerRackIndex == -1) {
+        Log.e("GameViewModel", "Impossible de retrouver le joker avec l'ID ${selectionState.tileId} sur le chevalet.")
+        return
+    }
+    val jokerTile = currentState.gameData.currentPlayerRack[jokerRackIndex]
+
+    // 2. On crée la nouvelle tuile joker avec la lettre assignée.
+    val assignedJoker = jokerTile.copy(assignedLetter = letter.uppercase())
+
+    // 3. On simule le placement de cette nouvelle tuile.
+    //    a. On retire la tuile originale du chevalet.
+    val newRack = currentState.gameData.currentPlayerRack.toMutableList().apply { removeAt(jokerRackIndex) }
+    //    b. On crée le 'PlacedTile' avec la tuile assignée et la position cible.
+    val newPlacedTile = PlacedTile(assignedJoker, selectionState.targetPosition)
+    //    c. On met à jour la liste des tuiles posées pendant ce tour.
+    val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
+    //    d. On crée le nouveau plateau visuel.
+    val newBoard = officialGameState!!.board.withTiles(updatedPlacedTiles)
+
+    // 4. On appelle notre "cerveau" pour qu'il recalcule tout.
+    //    Il va valider le coup, calculer le score, etc.
+    val newState = calculateNewUiState(currentState, newBoard, updatedPlacedTiles, newRack)
+
+    // 5. On applique ce nouvel état et on ferme le dialogue en une seule opération.
+    _uiState.value = newState.copy(
+        jokerSelectionState = null  // <-- C'est ici qu'on ferme le dialogue !
+    )
+
+    Log.d("GameViewModel", "Joker assigné à la lettre '$letter' et placé sur ${selectionState.targetPosition}.")
+}
+
+/**
+ * Appelé quand l'utilisateur annule la sélection du joker.
+ * Remet le joker dans le chevalet.
+ */
+//fun onJokerSelectionDismissed() {
+//    val currentState = _uiState.value
+//    if (currentState !is GameUiState.Playing) return
+//
+//    val selectionState = currentState.jokerSelectionState
+//    if (selectionState !is GameUiState.JokerSelectionState.Selecting) return
+//
+//    // On retire le joker du plateau et on le remet dans le chevalet
+//    val updatedGameData = onTileReturnToRack(
+//        position = selectionState.boardPosition,
+//        returnToRack = true
+//    )
+//
+//    // On ferme le dialog
+//    _uiState.value = currentState.copy(
+//        gameData = updatedGameData,
+//        jokerSelectionState = null
+//    )
+//}
+
 }

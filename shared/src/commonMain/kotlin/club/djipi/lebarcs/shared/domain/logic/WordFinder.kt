@@ -49,7 +49,7 @@ object WordFinder {
         for (col in startIndex..endIndex) {
             val currentPos = Position(row, col)
             val tile = board.getTile(currentPos) ?: return null // Sécurité, ne devrait jamais arriver
-            wordText += tile.letter
+            wordText += tile.displayLetter
             wordTiles.add(currentPos to tile)
         }
 
@@ -86,7 +86,7 @@ object WordFinder {
         for (row in startRow..endRow) {
             val currentPos = Position(row, col)
             val tile = board.getTile(currentPos) ?: return null
-            wordText += tile.letter
+            wordText += tile.displayLetter
             wordTiles.add(currentPos to tile)
         }
 

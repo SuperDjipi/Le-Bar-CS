@@ -2,13 +2,11 @@ package club.djipi.lebarcs.ui.screens.game.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi // Import crucial pour l'animation
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -42,7 +40,6 @@ fun TileRack(
     modifier: Modifier = Modifier,
     selectedIndex: Int? = null,
     dragDropManager: DragDropManager? = null,
-    onTileClick: (Int) -> Unit = {},
     onTileDragStart: (Int) -> Unit = {},
     onTileDragEnd: (Int) -> Unit = {}
 ) {
@@ -52,15 +49,15 @@ fun TileRack(
 
     // Largeur disponible = 90% de l'écran - padding - bordures
     val availableWidth = screenWidth * 0.9f - 32.dp // padding et bordures
-    // Taille d'une tuile = largeur disponible / 7 tuiles - espacements
-    val calcCellSize = (availableWidth - (8.dp * 6)).value / 7  // 6 espaces de 8dp entre 7 tuiles
+    // On divise par le nombre de slots (7) et on soustrait l'espacement
+    val horizontalPadding = 16.dp // Padding total du chevalet (8.dp de chaque côté)
+    val spacing = 4.dp // Espacement entre les tuiles
+    val calcCellSize = ((availableWidth - horizontalPadding - (spacing * 6)) / 7)
 
-    val tileSize = min( calcCellSize, 60.dp.value).dp // Maximum 60dp par tuile
-// --- DÉBUT DE L'AJOUT DE LA LOGIQUE DE DROP ---
+    val tileSize = min( calcCellSize.value, 60.dp.value).dp
 
     val dragState = dragDropManager?.state
     var rackBounds by remember { mutableStateOf<Rect?>(null) }
-
 // On calcule si le curseur est au-dessus du chevalet pendant un drag
     val isHoveredOverRack = if (dragState != null && dragState.isDragging && rackBounds != null) {
         dragState.currentCoordinates in rackBounds!!
@@ -90,40 +87,14 @@ fun TileRack(
 
     Box(
         modifier = modifier
-            .fillMaxWidth(0.95f) // 95% de la largeur d'écran
+            .fillMaxWidth(0.98f) // 95% de la largeur d'écran
             .shadow(8.dp, RoundedCornerShape(8.dp))
             .background(Color(0xFF8B7355), RoundedCornerShape(8.dp))
             .border(3.dp, Color(0xFF654321), RoundedCornerShape(8.dp))
-            .padding(12.dp)
+            .padding(vertical = 4.dp, horizontal = 8.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Votre chevalet",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                if (dragDropManager != null) {
-                    Text(
-                        text = "Maintenez pour déplacer",
-                        fontSize = 10.sp,
-                        color = Color(0xFFE8DCC4),
-                        fontWeight = FontWeight.Normal
-                    )
-                }
-            }
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -168,7 +139,7 @@ fun TileRack(
                     }
                 }
             }
-        }
+
     }
 }
 
@@ -187,25 +158,24 @@ fun TileRackPreview() {
             // Chevalet plein
             TileRack(
                 tiles = listOf(
-                    Tile(letter='S', points=1),
-                    Tile(letter='C', points=3),
-                    Tile(letter='R', points=1),
-                    Tile(letter='A', points=1),
-                    Tile(letter='B', points=3),
-                    Tile(letter='L', points=1),
-                    Tile(letter='E', points=1)
+                    Tile(letter ="S", points =1),
+                    Tile(letter ="C", points =3),
+                    Tile(letter ="R", points =1),
+                    Tile(letter ="A", points =1),
+                    Tile(letter ="B", points =3),
+                    Tile(letter ="L", points =1),
+                    Tile(letter ="E", points =1)
                 ),
-                selectedIndex = selectedIndex,
-                onTileClick = { selectedIndex = if (selectedIndex == it) null else it }
+                selectedIndex = selectedIndex
             )
 
             // Chevalet avec quelques tuiles
             TileRack(
                 tiles = listOf(
-                    Tile(letter='H', points=4),
-                    Tile(letter='E', points=1),
-                    Tile(letter='L', points=1),
-                    Tile(letter='_', points=0, isJoker = true)
+                    Tile(letter ="H", points =4),
+                    Tile(letter ="E", points =1),
+                    Tile(letter ="L", points =1),
+                    Tile(letter ="_", points =0, isJoker = true)
                 )
             )
         }

@@ -2,6 +2,7 @@ package club.djipi.lebarcs.ui.screens.game
 
 import club.djipi.lebarcs.shared.domain.logic.FoundWord
 import club.djipi.lebarcs.shared.domain.model.GameState
+import club.djipi.lebarcs.shared.domain.model.Position
 
 /**
  * Définit tous les états possibles de l'interface utilisateur pour l'écran de jeu.
@@ -52,7 +53,8 @@ sealed class GameUiState {
         val selectedTileIndex: Int? = null,
         val foundWordsForCurrentMove: List<FoundWord> = emptyList(),
         val currentMoveScore: Int = 0,
-        val isCurrentMoveValid: Boolean = false
+        val isCurrentMoveValid: Boolean = false,
+        val jokerSelectionState: JokerSelectionState? = null
     ) : GameUiState() {
 
         /**
@@ -63,6 +65,21 @@ sealed class GameUiState {
          */
         val isLocalPlayerTurn: Boolean
             get() = gameData.players.getOrNull(gameData.currentPlayerIndex)?.id == localPlayerId
+    }
+    /**
+     * État représentant la sélection d'une lettre pour un joker.
+     */
+    sealed class JokerSelectionState {
+        /**
+         * L'utilisateur doit choisir une lettre pour un joker.
+         *
+         * @param targetPosition Position sur le plateau où le joker a été placé
+         * @param tileId ID unique de la tuile joker (pour la retrouver facilement)
+         */
+        data class Selecting(
+            val targetPosition: Position,
+            val tileId: String
+        ) : JokerSelectionState()
     }
 
     /*** Représente un état d'erreur irrécupérable (par exemple, échec de la connexion).

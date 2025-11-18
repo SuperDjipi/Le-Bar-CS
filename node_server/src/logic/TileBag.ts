@@ -27,22 +27,25 @@ export function createTileBag(): Tile[] {
     const bag: Tile[] = [];
     let idCounter = 0;
 
-    for (const [letter,data] of Object.entries(TILE_DISTRIBUTION)) {
+    for (const [letter, data] of Object.entries(TILE_DISTRIBUTION)) {
         for (let i = 0; i < data.count; i++) {
             bag.push({
                 id: `tile-${idCounter++}`,
                 letter: letter,
-                points: data.points
+                points: data.points,
+                isJoker: letter === '_',
+                assignedLetter: null
             });
         }
     }
+    // Pour tester le joker
+    // [bag[0]!, bag[bag.length - 1]!] = [bag[bag.length - 1]!, bag[0]!];
 
     // Mélange de Fisher-Yates pour un mélange aléatoire efficace
     for (let i = bag.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [bag[i]!, bag[j]!] = [bag[j]!, bag[i]!];
     }
-        // bag.sort(() => Math.random() - 0.5);
 
     console.log(`Pioche créée avec ${bag.length} tuiles.`);
     return bag;

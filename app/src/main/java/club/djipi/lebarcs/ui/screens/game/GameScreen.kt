@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import club.djipi.lebarcs.ui.screens.game.components.GameContent
+import club.djipi.lebarcs.ui.screens.game.components.JokerSelectionDialog
 import club.djipi.lebarcs.ui.screens.game.components.TileView
 import club.djipi.lebarcs.ui.screens.game.dragdrop.ProvideDragDropManager
 import kotlin.text.toInt
@@ -82,7 +83,19 @@ fun GameScreen(
                     viewModel = viewModel,
                     modifier = Modifier.padding(paddingValues)
                 )
+                if (state.jokerSelectionState != null) {
+                    JokerSelectionDialog(
+                        onLetterSelected = { letter ->
+                            viewModel.onJokerLetterSelected(letter)
+                        },
+                        onDismiss = {
+//                        viewModel.onJokerSelectionDismissed()
+                        }
+                    )
+                }
             }
+
+
 
             is GameUiState.Error -> {
                 // Si une erreur se produit, on affiche un message clair et un bouton pour quitter.
@@ -178,7 +191,7 @@ private fun GameLayout(
                             .offset {
                                 IntOffset(
                                     x = (dragState.currentCoordinates.x - tileSizePx / 2).toInt(),
-                                    y = (dragState.currentCoordinates.y - tileSizePx / 2).toInt()
+                                    y = (dragState.currentCoordinates.y - tileSizePx).toInt()
                                 )
                             }
                             // 2. On applique les effets visuels

@@ -3,10 +3,10 @@ package club.djipi.lebarcs.ui.screens.game.components
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,7 +64,7 @@ fun TileView(
                 tileCoordinates = coordinates.positionInWindow()
             }
             .pointerInput(source) { // La clé est `source` pour que le geste soit réactif au changement de tuile/position
-                detectDragGesturesAfterLongPress(
+                detectDragGestures(
                     onDragStart = { touchOffset ->
                         val initialCoordinates = tileCoordinates + touchOffset
                         dragDropManager.startDrag(tile, source, initialCoordinates)
@@ -95,10 +95,10 @@ fun TileView(
             .shadow(if (enabled) 4.dp else 1.dp, RoundedCornerShape(4.dp))
             .background(backgroundColor, RoundedCornerShape(4.dp))
             .border(2.dp, borderColor, RoundedCornerShape(4.dp))
-            .padding(4.dp),
+            .padding(2.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (tile.isJoker && tile.letter == '_') {
+        if (tile.isJoker && tile.assignedLetter == null) {
             // Joker vide
             Text(
                 text = "?",
@@ -107,26 +107,26 @@ fun TileView(
                 color = Color(0xFF8B4513)
             )
         } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center)  {
                 // Lettre
                 Text(
-                    text = tile.letter.toString(),
-                    fontSize = (size.value * 0.5).sp,
+                    text = tile.displayLetter,
+                    fontSize = (size.value * 0.8).sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2F4F4F)
+                    color = Color(0xFF2F4F4F),
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 5.dp)
                 )
 
                 // Points (en petit en bas à droite)
                 if (!tile.isJoker) {
                     Text(
                         text = tile.points.toString(),
-                        fontSize = (size.value * 0.2).sp,
+                        fontSize = (size.value * 0.25).sp,
                         fontWeight = FontWeight.Normal,
-                        color = Color(0xFF696969),
-                        modifier = Modifier.offset(x = (size.value * 0.25).dp, y = -(size.value * 0.1).dp)
+                        color = Color(0xFF1F3F3F),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 1.5.dp)
                     )
                 }
             }
@@ -150,19 +150,44 @@ fun EmptyTileSlot(
     )
 }
 
+//@Preview(showBackground = true)
+//@Composable
+//fun TileViewPreview() {
+//    LeBarCSTheme {
+//        Row(
+//            modifier = Modifier.padding(16.dp),
+//            horizontalArrangement = Arrangement.spacedBy(8.dp)
+//        ) {
+//            TileView(tile = Tile(letter = "A", points = 1))
+//            TileView(tile = Tile(letter = "K", points = 10))
+//            TileView(tile = Tile(letter = "_", points = 0, isJoker = true))
+//            TileView(tile = Tile(letter = "E", points = 1), isSelected = true)
+//            TileView(tile = Tile(letter = "Z", points = 10), enabled = false)
+//        }
+//    }
+//}
+
 @Preview(showBackground = true)
 @Composable
-fun TileViewPreview() {
+fun TileViewSizeTestPreview() {
     LeBarCSTheme {
         Row(
             modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            TileView(tile = Tile(letter = 'A', points = 1))
-            TileView(tile = Tile(letter = 'K', points = 10))
-            TileView(tile = Tile(letter = '_', points = 0, isJoker = true))
-            TileView(tile = Tile(letter = 'E', points = 1), isSelected = true)
-            TileView(tile = Tile(letter = 'Z', points = 10), enabled = false)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("50dp (Default)")
+                TileView(tile = Tile(letter = "Z", points = 10), size = 50.dp)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("42dp (Small Phone)")
+                TileView(tile = Tile(letter = "Z", points = 10), size = 42.dp)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("60dp (Large Phone)")
+                TileView(tile = Tile(letter = "Z", points = 10), size = 60.dp)
+            }
         }
     }
 }
