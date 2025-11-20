@@ -123,5 +123,5 @@ android-lint = { id = "com.android.lint", version.ref = "agp" }
 [bundles]
 compose = ["androidx-compose-ui", "androidx-compose-ui-graphics", "androidx-compose-ui-tooling-preview", "androidx-compose-material3"]
 ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-websockets", "ktor-server-content-negotiation", "ktor-serialization-kotlinx-json"]
-ktor-client = ["ktor-client-core", "ktor-client-android", "ktor-client-websockets", "ktor-client-content-negotiation", "ktor-client-logging", "ktor-serialization-kotlinx-json"]
+ktor-client = ["ktor-client-core", "ktor-client-android", "ktor-client-websockets", "ktor-client-content-negotiation", "ktor-client-logging", "kotlinx-serialization-json"]
 room = ["room-runtime", "room-ktx", "room-compiler"]

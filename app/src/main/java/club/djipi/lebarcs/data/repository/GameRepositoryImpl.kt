@@ -1,6 +1,5 @@
 package club.djipi.lebarcs.data.repository
 
-import androidx.activity.result.launch
 import club.djipi.lebarcs.di.ApplicationScope
 import club.djipi.lebarcs.data.remote.WebSocketClient
 import club.djipi.lebarcs.shared.domain.model.PlacedTile
@@ -8,17 +7,29 @@ import club.djipi.lebarcs.shared.domain.repository.GameRepository
 import club.djipi.lebarcs.shared.network.ClientToServerEvent
 import club.djipi.lebarcs.shared.network.PlayMovePayload
 import club.djipi.lebarcs.shared.network.ServerToClientEvent
+import io.ktor.client.HttpClient
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import javax.inject.Inject
+
+@Serializable
+private data class CreateGameRequest(val creatorId: String)
+
+@Serializable
+private data class CreateGameResponse(val gameId: String)
 
 class GameRepositoryImpl @Inject constructor(
     private val webSocketClient: WebSocketClient,
     // On injecte un scope de coroutine qui vivra aussi longtemps que l'application
-    @ApplicationScope private val externalScope: CoroutineScope
+    @ApplicationScope private val externalScope: CoroutineScope,
+    private val httpClient: HttpClient
 ) : GameRepository {
 
     // On stocke le flux d'événements
@@ -50,17 +61,24 @@ class GameRepositoryImpl @Inject constructor(
         webSocketClient.sendEvent(playMoveEvent)
     }
 
-    override suspend fun createGame(): String {
-        // TODO: Remplacer ceci par un véritable appel réseau au serveur Node.js
-        // pour créer une nouvelle partie.
+    override suspend fun createGame(creatorId: String): String {
+        try {
+            // On fait un appel POST à notre API serveur
+            val response: CreateGameResponse = httpClient.post("http://djipi.club:8080/api/games") {
+                contentType(ContentType.Application.Json)
+                // On met l'ID du créateur dans le corps de la requête
+                setBody(CreateGameRequest(creatorId = creatorId))
+            }.body()
 
-        // Pour l'instant, on simule la création d'une partie et on retourne un ID.
-        // Cela permettra au HomeViewModel de fonctionner.
-        println("GameRepository: Simulation de la création d'une partie...")
-        val newGameId = (100..999).random().toString() // Génère un ID aléatoire comme "451"
-        println("GameRepository: Partie simulée avec l'ID $newGameId")
-        return newGameId
+            println("GameRepository: Partie réelle créée avec l'ID ${response.gameId}")
+            return response.gameId
+
+        } catch (e: Exception) {
+            println("GameRepository: Erreur lors de la création de la partie: ${e.message}")
+            throw e // On propage l'erreur pour que le ViewModel la gère
+        }
     }
+
     override fun close() {
         webSocketClient.close()
     }

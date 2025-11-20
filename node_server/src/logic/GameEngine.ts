@@ -36,7 +36,7 @@ export function processPlayMove(
     placedTiles: PlacedTile[]
 ): GameState | null {
 
-    const placedPositions = placedTiles.map(p => p.position);
+    const placedPositions = placedTiles.map(p => p.boardPosition);
     const originalBoard = currentGame.board;
 
     // --- Étape 1 : Création du plateau temporaire ---

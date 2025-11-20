@@ -9,7 +9,7 @@ import kotlin.jvm.JvmInline
  */
 @Immutable
 @Serializable
-data class Position(
+data class BoardPosition(
     val row: Int,
     val col: Int
 )
@@ -32,7 +32,7 @@ enum class BonusType {
 @Immutable
 @Serializable
 data class BoardCell(
-    val position: Position,
+    val boardPosition: BoardPosition,
     val bonus: BonusType = BonusType.NONE,
     val tile: Tile? = null,        // null si case vide
     val isLocked: Boolean = false   // true si la tuile a déjà été jouée
@@ -47,12 +47,33 @@ data class BoardCell(
 value class Board(
     val cells: List<List<BoardCell>> = initializeBoard()
 ) {
-    fun getTile(position: Position): Tile? {
-        return cells[position.row][position.col].tile
+    fun getTile(boardPosition: BoardPosition): Tile? {
+        return cells[boardPosition.row][boardPosition.col].tile
     }
 
-    fun getCell(position: Position): BoardCell {
-        return cells[position.row][position.col]
+    /**
+     * Extension pour vérifier si le plateau est vide (aucune tuile posée)
+     */
+    fun isEmpty(): Boolean {
+        return cells.all { row -> row.all { cell -> cell.tile == null } }
+    }
+
+    /**
+     * Extension pour récupérer une cellule à une position donnée
+     */
+    fun getCellAt(position: BoardPosition): BoardCell? {
+        return if (position.row in 0 until SIZE && position.col in 0 until SIZE) {
+            cells[position.row][position.col]
+        } else {
+            null
+        }
+    }
+
+    /**
+     * Extension pour vérifier si une position contient une tuile
+     */
+    fun hasTileAt(position: BoardPosition): Boolean {
+        return getCellAt(position)?.tile != null
     }
 
     companion object {
@@ -65,7 +86,7 @@ value class Board(
             return List(SIZE) { row ->
                 List(SIZE) { col ->
                     BoardCell(
-                        position = Position(row, col),
+                        boardPosition = BoardPosition(row, col),
                         bonus = determineBonusType(row, col)
                     )
                 }

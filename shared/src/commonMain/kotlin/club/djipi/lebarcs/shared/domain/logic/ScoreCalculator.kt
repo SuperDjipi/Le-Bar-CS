@@ -1,13 +1,12 @@
 package club.djipi.lebarcs.shared.domain.logic
 
-import club.djipi.lebarcs.shared.domain.logic.FoundWord
 import club.djipi.lebarcs.shared.domain.model.Board
 import club.djipi.lebarcs.shared.domain.model.BonusType
-import club.djipi.lebarcs.shared.domain.model.Position
+import club.djipi.lebarcs.shared.domain.model.BoardPosition
 
 object ScoreCalculator {
 
-    fun calculateScore(word: FoundWord, board: Board, newTiles: List<Position>): Int {
+    fun calculateScore(word: FoundWord, board: Board, newTiles: List<BoardPosition>): Int {
         var wordScore = 0
         var wordMultiplier = 1
 

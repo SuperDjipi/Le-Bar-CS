@@ -1,8 +1,8 @@
-import type { Board, Position } from '../models/GameModels.js';
+import type { Board, BoardPosition } from '../models/GameModels.js';
 
 const BOARD_SIZE = 15;
 
-function getTile(board: Board, position: Position): any | null {
+function getTile(board: Board, position: BoardPosition): any | null {
     // ... (copiez la même fonction getTile que dans WordFinder)
     if (position.row >= 0 && position.row < BOARD_SIZE && position.col >= 0 && position.col < BOARD_SIZE) {
         return board[position.row]![position.col]!.tile;
@@ -10,7 +10,7 @@ function getTile(board: Board, position: Position): any | null {
     return null;
 }
 
-export function isPlacementValid(board: Board, placedTiles: Position[]): boolean {
+export function isPlacementValid(board: Board, placedTiles: BoardPosition[]): boolean {
     if (placedTiles.length <= 1) return true;
 
     const rows = new Set(placedTiles.map(p => p.row));
@@ -57,7 +57,7 @@ export function isPlacementValid(board: Board, placedTiles: Position[]): boolean
     return true;
 }
 
-export function isMoveConnected(board: Board, placedTiles: Position[], turnNumber: number): boolean {
+export function isMoveConnected(board: Board, placedTiles: BoardPosition[], turnNumber: number): boolean {
     const centerPos = Math.floor(BOARD_SIZE / 2);
 
     if (turnNumber === 1) {

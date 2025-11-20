@@ -4,7 +4,7 @@
     <domain-config cleartextTrafficPermitted="true">
         <!-- L'adresse de l'hôte pour l'émulateur Android -->
         <!-- <domain includeSubdomains="true">10.0.2.2</domain> -->
-        <domain includeSubdomains="true">100.117.44.105</domain>
+        <domain includeSubdomains="true">djipi.club</domain>
         <!-- Vous pouvez ajouter ici l'IP de votre machine pour les tests sur appareil physique -->
         <!-- <domain includeSubdomains="true">192.168.1.45</domain> -->
     </domain-config>

@@ -35,7 +35,7 @@ class WebSocketClient @Inject constructor(
     suspend fun connect(gameId: String, localPlayerId: String): Flow<ServerToClientEvent> {
         try {
             session = httpClient.webSocketSession {
-                url("ws://100.117.44.105:8080/ws/$gameId?playerId=$localPlayerId")
+                url("ws://djipi.club:8080/ws/$gameId?playerId=$localPlayerId")
             }
             return session!!.incoming
                 .consumeAsFlow()

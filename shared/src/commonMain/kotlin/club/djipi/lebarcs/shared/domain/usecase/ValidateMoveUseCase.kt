@@ -18,7 +18,7 @@ class ValidateMoveUseCase(
     ): Boolean {
         if (placedTiles.isEmpty()) return false
 
-        val placedTilesMap = placedTiles.associate { it.position to it.tile }
+        val placedTilesMap = placedTiles.associate { it.boardPosition to it.tile }
 
         val isPlacementValid = MoveValidator.isPlacementValid(originalBoard, placedTilesMap.keys)
         val isMoveConnected =

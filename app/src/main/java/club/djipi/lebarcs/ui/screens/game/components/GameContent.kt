@@ -21,7 +21,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import club.djipi.lebarcs.shared.domain.model.GameState
-import club.djipi.lebarcs.shared.domain.model.Position
+import club.djipi.lebarcs.shared.domain.model.BoardPosition
+import club.djipi.lebarcs.shared.domain.model.Tile
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DragDropManager
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DragSource
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DropTarget
@@ -34,14 +35,15 @@ fun GameContent(
     localPlayerId: String,
     selectedTileIndex: Int?,
     dragDropManager: DragDropManager,
-    onTilePlacedFromRack: (rackIndex: Int, position: Position) -> Unit,
-    onTileMovedOnBoard: (from: Position, to: Position) -> Unit,
-    onTileReturnedToRack: (from: Position) -> Unit,
+    onTilePlacedFromRack: (rackIndex: Int, boardPosition: BoardPosition) -> Unit,
+    onTileMovedOnBoard: (from: BoardPosition, to: BoardPosition) -> Unit,
+    onTileReturnedToRack: (from: BoardPosition) -> Unit,
     onRackTilesReordered: (from: Int, to: Int) -> Unit,
     onShuffleRack: () -> Unit,
     onUndoMove: () -> Unit,
     onPlayMove: () -> Unit,
     onPass: () -> Unit,
+    getValidDropBoardPositions: () -> Set<BoardPosition>,
     modifier: Modifier = Modifier
 ) {
     // Observer les résultats du drag & drop
@@ -54,16 +56,16 @@ fun GameContent(
             if (source is DragSource.Rack && target is DropTarget.Board) {
                 // On a placé une tuile sur le plateau
                 Log.d(TAG, "D&d terminé (Rack->Board) : source=$source, target=$target")
-                onTilePlacedFromRack(source.index, target.position)
+                onTilePlacedFromRack(source.index, target.boardPosition)
             }
             if (source is DragSource.Board && target is DropTarget.Board) {
                 // On a déplacé une tuile sur le plateau
-                onTileMovedOnBoard(source.position, target.position)
+                onTileMovedOnBoard(source.boardPosition, target.boardPosition)
             }
             if (source is DragSource.Board && target is DropTarget.Rack) {
                 // Logique pour remettre sur le chevalet...
                 Log.d(TAG, "Drop détecté : Plateau -> Chevalet")
-                onTileReturnedToRack(source.position)
+                onTileReturnedToRack(source.boardPosition)
             }
             if (source is DragSource.Rack && target is DropTarget.Rack) {
                 // Logique pour réorganiser le chevalet...
@@ -123,7 +125,8 @@ fun GameContent(
             },
             onTileDragEnd = { index ->
                 println("Fin du drag de la tuile à l'index $index")
-            }
+            },
+            getValidBoardPositions = getValidDropBoardPositions
         )
 
         // Boutons d'action

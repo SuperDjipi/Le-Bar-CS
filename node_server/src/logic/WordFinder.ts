@@ -1,11 +1,11 @@
-import type { Board, Position, Tile, FoundWord } from '../models/GameModels.js';
+import type { Board, BoardPosition, Tile, FoundWord } from '../models/GameModels.js';
 import { Direction } from '../models/GameModels.js';
 
 const BOARD_SIZE = 15;
 
-function getTile(board: Board, position: Position): Tile | null {
-    if (position.row >= 0 && position.row < BOARD_SIZE && position.col >= 0 && position.col < BOARD_SIZE) {
-        return board[position.row]![position.col]!.tile;
+function getTile(board: Board, boardPosition: BoardPosition): Tile | null {
+    if (boardPosition.row >= 0 && boardPosition.row < BOARD_SIZE && boardPosition.col >= 0 && boardPosition.col < BOARD_SIZE) {
+        return board[boardPosition.row]![boardPosition.col]!.tile;
     }
     return null;
 }
@@ -21,7 +21,7 @@ function getDisplayLetter(tile: Tile): string {
 }
 // ----------------------------------------
 
-export function findHorizontalWord(board: Board, startPos: Position): FoundWord | null {
+export function findHorizontalWord(board: Board, startPos: BoardPosition): FoundWord | null {
     if (getTile(board, startPos) === null) {
         return null;
     }
@@ -47,19 +47,19 @@ export function findHorizontalWord(board: Board, startPos: Position): FoundWord 
     // 3. Construire le mot
     let wordText = "";
     // On doit aussi garder une trace des tuiles et de la position de départ
-    const wordTiles: { tile: Tile, position: Position }[] = [];
-    const startOfWordPos: Position = { row, col: startIndex };
+    const wordTiles: { tile: Tile, boardPosition: BoardPosition }[] = [];
+    const startOfWordPos: BoardPosition = { row, col: startIndex };
     for (let col = startIndex; col <= endIndex; col++) {
         const tile = getTile(board, { row, col });
         if (!tile) return null; // Sécurité
         wordText += getDisplayLetter(tile);
-        wordTiles.push({ tile, position: { row, col } });
+        wordTiles.push({ tile, boardPosition: { row, col } });
     }
 
     return { text: wordText, tiles: wordTiles, direction: Direction.HORIZONTAL, start: startOfWordPos };
 }
 
-export function findVerticalWord(board: Board, startPos: Position): FoundWord | null {
+export function findVerticalWord(board: Board, startPos: BoardPosition): FoundWord | null {
     if (getTile(board, startPos) === null) {
         return null;
     }
@@ -85,19 +85,19 @@ export function findVerticalWord(board: Board, startPos: Position): FoundWord | 
     // 3. Construire le mot
     let wordText = "";
     // On doit aussi garder une trace des tuiles et de la position de départ
-    const wordTiles: { tile: Tile, position: Position }[] = [];
-    const startOfWordPos: Position = { row: startIndex , col};
+    const wordTiles: { tile: Tile, boardPosition: BoardPosition }[] = [];
+    const startOfWordPos: BoardPosition = { row: startIndex , col};
     for (let row = startIndex; row <= endIndex; row++) {
         const tile = getTile(board, { row, col });
         if (!tile) return null;
         wordText += getDisplayLetter(tile);
-        wordTiles.push({ tile, position: { row, col } });
+        wordTiles.push({ tile, boardPosition: { row, col } });
     }
 
     return { text: wordText, tiles: wordTiles, direction: Direction.VERTICAL, start: startOfWordPos };
 }
 
-export function findAllWordsFormedByMove(board: Board, placedTiles: { position: Position, tile: Tile }[]): Set<FoundWord> {
+export function findAllWordsFormedByMove(board: Board, placedTiles: { boardPosition: BoardPosition, tile: Tile }[]): Set<FoundWord> {
     if (placedTiles.length === 0) {
         return new Set();
     }
@@ -106,14 +106,14 @@ export function findAllWordsFormedByMove(board: Board, placedTiles: { position: 
     const foundWordsMap = new Map<string, FoundWord>();
 
     for (const placed of placedTiles) {
-        const hWord = findHorizontalWord(board, placed.position);
+        const hWord = findHorizontalWord(board, placed.boardPosition);
         if (hWord) {
             // On crée une clé unique : ex: "MOT_HORIZONTAL_7_5"
             const key = `${hWord.text}_${hWord.direction}_${hWord.start.row}_${hWord.start.col}`;
             foundWordsMap.set(key, hWord);
         }
 
-        const vWord = findVerticalWord(board, placed.position);
+        const vWord = findVerticalWord(board, placed.boardPosition);
         if (vWord) {
             // Clé unique pour le mot vertical
             const key = `${vWord.text}_${vWord.direction}_${vWord.start.row}_${vWord.start.col}`;

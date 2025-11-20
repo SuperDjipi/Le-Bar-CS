@@ -118,6 +118,51 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    // --- Utilitaires UX
+    /**
+     * Calcule les positions valides pour placer une tuile.
+     * Doit retourner les cases adjacentes aux mots existants + la case centrale si vide.
+     */
+    fun getValidDropPositions(fromRack: Boolean = true): Set<BoardPosition> {
+        val currentState = _uiState.value
+        if (currentState !is GameUiState.Playing) return emptySet()
+
+        val board = currentState.gameData.board
+        val validPositions = mutableSetOf<BoardPosition>()
+
+        // Si c'est le premier coup, seulement la case centrale
+        if (board.isEmpty()) {
+            validPositions.add(BoardPosition(7, 7)) // Case centrale (15x15)
+            return validPositions
+        }
+
+        // Sinon, toutes les cases vides adjacentes à une tuile existante
+        for (row in 0 until 15) {
+            for (col in 0 until 15) {
+                val pos = BoardPosition(row, col)
+                val cell = board.getCellAt(pos)
+
+                // Si vide ET adjacente à une tuile
+                if (cell?.tile == null && hasAdjacentTile(board, pos)) {
+                    validPositions.add(pos)
+                }
+            }
+        }
+
+        return validPositions
+    }
+
+    private fun hasAdjacentTile(board: Board, position: BoardPosition): Boolean {
+        val adjacents = listOf(
+            BoardPosition(position.row - 1, position.col),
+            BoardPosition(position.row + 1, position.col),
+            BoardPosition(position.row, position.col - 1),
+            BoardPosition(position.row, position.col + 1)
+        )
+
+        return adjacents.any { board.getCellAt(it)?.tile != null }
+    }
+
     // --- LOGIQUE DE JEU EN TEMPS RÉEL (CLIENT-SIDE) ---
 
     /**
@@ -125,7 +170,7 @@ class GameViewModel @Inject constructor(
      * C'est une action "optimiste" : l'UI est mise à jour immédiatement
      * avant même la confirmation du serveur.
      */
-    fun onTilePlacedFromRack(rackIndex: Int, targetPosition: Position) {
+    fun onTilePlacedFromRack(rackIndex: Int, targetBoardPosition: BoardPosition) {
         val currentState = _uiState.value
         if (currentState !is GameUiState.Playing) return
 
@@ -135,7 +180,7 @@ class GameViewModel @Inject constructor(
             //1. On prépare les nouvelles données (nouveau chevalet, nouvelle liste de tuiles posées).
             val newRack = currentState.gameData.currentPlayerRack.toMutableList()
                 .apply { removeAt(rackIndex) }
-            val newPlacedTile = PlacedTile(tileToMove, targetPosition)
+            val newPlacedTile = PlacedTile(tileToMove, targetBoardPosition)
             val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
             val newBoard = officialGameState!!.board.withTiles(updatedPlacedTiles)
             // 2. On délègue le calcul complexe à une fonction privée.
@@ -144,24 +189,24 @@ class GameViewModel @Inject constructor(
             // C'est un joker ! On met à jour l'état pour déclencher le dialogue.
             newState = currentState.copy(
                 jokerSelectionState = GameUiState.JokerSelectionState.Selecting(
-                    targetPosition = targetPosition,
+                    targetBoardPosition = targetBoardPosition,
                     tileId = tileToMove.id
                 )
             )
-            Log.d("GameViewModel", "Joker posé sur $targetPosition. En attente de la sélection de la lettre...")
+            Log.d("GameViewModel", "Joker posé sur $targetBoardPosition. En attente de la sélection de la lettre...")
         }
         // 3. On applique le nouvel état calculé à l'UI.
         _uiState.value = newState
     }
     // ... (onTileMovedOnBoard, onTileReturnedToRack, etc. suivent une logique similaire)
-    fun onTileMovedOnBoard(fromPosition: Position, toPosition: Position) {
+    fun onTileMovedOnBoard(fromBoardPosition: BoardPosition, toBoardPosition: BoardPosition) {
         val currentState = _uiState.value
         if (currentState !is GameUiState.Playing) return
 
-        val tileToMove = currentState.gameData.placedTiles.find { it.position == fromPosition }?.tile ?: return
+        val tileToMove = currentState.gameData.placedTiles.find { it.boardPosition == fromBoardPosition }?.tile ?: return
 
-        val intermediatePlacedTiles = currentState.gameData.placedTiles.filter { it.position != fromPosition }
-        val finalPlacedTiles = intermediatePlacedTiles + PlacedTile(tileToMove, toPosition)
+        val intermediatePlacedTiles = currentState.gameData.placedTiles.filter { it.boardPosition != fromBoardPosition }
+        val finalPlacedTiles = intermediatePlacedTiles + PlacedTile(tileToMove, toBoardPosition)
         if (officialGameState == null) return
         val newBoard = officialGameState!!.board.withTiles(finalPlacedTiles)
 
@@ -173,12 +218,12 @@ class GameViewModel @Inject constructor(
         )
     }
 
-    fun onTileReturnedToRack(fromPosition: Position) {
+    fun onTileReturnedToRack(fromBoardPosition: BoardPosition) {
         val currentState = _uiState.value
         if (currentState !is GameUiState.Playing) return
 
-        val tileToReturn = currentState.gameData.placedTiles.find { it.position == fromPosition }?.tile ?: return
-        val newPlacedTiles = currentState.gameData.placedTiles.filter { it.position != fromPosition }
+        val tileToReturn = currentState.gameData.placedTiles.find { it.boardPosition == fromBoardPosition }?.tile ?: return
+        val newPlacedTiles = currentState.gameData.placedTiles.filter { it.boardPosition != fromBoardPosition }
         val newRack = currentState.gameData.currentPlayerRack + tileToReturn
         if (officialGameState == null) return
         val newBoard = officialGameState!!.board.withTiles(newPlacedTiles)
@@ -222,7 +267,7 @@ class GameViewModel @Inject constructor(
         newRack: List<Tile>
     ): GameUiState.Playing {
         // Validation
-        val placedTilesMap = newPlacedTiles.associate { it.position to it.tile }
+        val placedTilesMap = newPlacedTiles.associate { it.boardPosition to it.tile }
         val isPlacementValid =
             MoveValidator.isPlacementValid(currentState.gameData.board, placedTilesMap.keys)
         val isMoveConnected = MoveValidator.isMoveConnected(
@@ -245,7 +290,7 @@ class GameViewModel @Inject constructor(
         val score = if (isMoveValid) {
             val scrabbleBonus = if (newPlacedTiles.size == 7) 50 else 0
             foundWords.sumOf { word ->
-                ScoreCalculator.calculateScore(word, newBoard, newPlacedTiles.map { it.position })
+                ScoreCalculator.calculateScore(word, newBoard, newPlacedTiles.map { it.boardPosition })
             } + scrabbleBonus
         } else {
             0
@@ -309,7 +354,7 @@ class GameViewModel @Inject constructor(
             // par la dernière version propre que nous avons sauvegardée.
             _uiState.value = GameUiState.Playing(
                 gameData = officialGameState!!,
-                localPlayerId = "player1"
+                localPlayerId = this.localPlayerId ?: ""
             )
             Log.d("GameViewModel", "Annulation : retour à l'état officiel du serveur.")
         } else {
@@ -371,7 +416,7 @@ fun onJokerLetterSelected(letter: Char) {
     //    a. On retire la tuile originale du chevalet.
     val newRack = currentState.gameData.currentPlayerRack.toMutableList().apply { removeAt(jokerRackIndex) }
     //    b. On crée le 'PlacedTile' avec la tuile assignée et la position cible.
-    val newPlacedTile = PlacedTile(assignedJoker, selectionState.targetPosition)
+    val newPlacedTile = PlacedTile(assignedJoker, selectionState.targetBoardPosition)
     //    c. On met à jour la liste des tuiles posées pendant ce tour.
     val updatedPlacedTiles = currentState.gameData.placedTiles + newPlacedTile
     //    d. On crée le nouveau plateau visuel.
@@ -386,7 +431,7 @@ fun onJokerLetterSelected(letter: Char) {
         jokerSelectionState = null  // <-- C'est ici qu'on ferme le dialogue !
     )
 
-    Log.d("GameViewModel", "Joker assigné à la lettre '$letter' et placé sur ${selectionState.targetPosition}.")
+    Log.d("GameViewModel", "Joker assigné à la lettre '$letter' et placé sur ${selectionState.targetBoardPosition}.")
 }
 
 /**

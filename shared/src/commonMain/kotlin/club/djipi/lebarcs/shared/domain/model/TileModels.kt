@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class PlacedTile(
     val tile: Tile,
-    val position: Position
+    val boardPosition: BoardPosition
 )
 
 /**

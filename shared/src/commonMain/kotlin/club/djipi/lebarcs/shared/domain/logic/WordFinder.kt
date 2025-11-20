@@ -2,7 +2,7 @@ package club.djipi.lebarcs.shared.domain.logic
 
 import club.djipi.lebarcs.shared.domain.model.Board
 import club.djipi.lebarcs.shared.domain.model.Direction
-import club.djipi.lebarcs.shared.domain.model.Position
+import club.djipi.lebarcs.shared.domain.model.BoardPosition
 import club.djipi.lebarcs.shared.domain.model.Tile
 import kotlinx.serialization.Serializable
 
@@ -10,14 +10,14 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class FoundWord(
     val text: String,
-    val tiles: List<Pair<Position, Tile>>, // Pour savoir quelles tuiles le composent
+    val tiles: List<Pair<BoardPosition, Tile>>, // Pour savoir quelles tuiles le composent
     val direction: Direction
 )
 
 object WordFinder {
 
     // --- ON RECOMMENCE ICI, PROPREMENT ---
-    fun findHorizontalWord(board: Board, startPos: Position): FoundWord? {
+    fun findHorizontalWord(board: Board, startPos: BoardPosition): FoundWord? {
         // Sécurité : on s'assure que la position de départ est valide
         if (board.getTile(startPos) == null) {
             return null
@@ -28,13 +28,13 @@ object WordFinder {
 
         // 1. Trouver la colonne de début
         var startIndex = startPos.col
-        while (startIndex > 0 && board.getTile(Position(row, startIndex - 1)) != null) {
+        while (startIndex > 0 && board.getTile(BoardPosition(row, startIndex - 1)) != null) {
             startIndex--
         }
 
         // 2. Trouver la colonne de fin
         var endIndex = startPos.col
-        while (endIndex < boardSize - 1 && board.getTile(Position(row, endIndex + 1)) != null) {
+        while (endIndex < boardSize - 1 && board.getTile(BoardPosition(row, endIndex + 1)) != null) {
             endIndex++
         }
 
@@ -44,10 +44,10 @@ object WordFinder {
         }
 
         // 3. Construire le mot
-        val wordTiles = mutableListOf<Pair<Position, Tile>>()
+        val wordTiles = mutableListOf<Pair<BoardPosition, Tile>>()
         var wordText = ""
         for (col in startIndex..endIndex) {
-            val currentPos = Position(row, col)
+            val currentPos = BoardPosition(row, col)
             val tile = board.getTile(currentPos) ?: return null // Sécurité, ne devrait jamais arriver
             wordText += tile.displayLetter
             wordTiles.add(currentPos to tile)
@@ -56,7 +56,7 @@ object WordFinder {
         return FoundWord(wordText, wordTiles, Direction.HORIZONTAL)
     }
 
-    fun findVerticalWord(board: Board, startPos: Position): FoundWord? {
+    fun findVerticalWord(board: Board, startPos: BoardPosition): FoundWord? {
         if (board.getTile(startPos) == null) {
             return null
         }
@@ -66,13 +66,13 @@ object WordFinder {
 
         // 1. Trouver la ligne de début (en remontant)
         var startRow = startPos.row
-        while (startRow > 0 && board.getTile(Position(startRow - 1, col)) != null) {
+        while (startRow > 0 && board.getTile(BoardPosition(startRow - 1, col)) != null) {
             startRow--
         }
 
         // 2. Trouver la ligne de fin (en descendant)
         var endRow = startPos.row
-        while (endRow < boardSize - 1 && board.getTile(Position(endRow + 1, col)) != null) {
+        while (endRow < boardSize - 1 && board.getTile(BoardPosition(endRow + 1, col)) != null) {
             endRow++
         }
 
@@ -81,10 +81,10 @@ object WordFinder {
         }
 
         // 3. Construire le mot
-        val wordTiles = mutableListOf<Pair<Position, Tile>>()
+        val wordTiles = mutableListOf<Pair<BoardPosition, Tile>>()
         var wordText = ""
         for (row in startRow..endRow) {
-            val currentPos = Position(row, col)
+            val currentPos = BoardPosition(row, col)
             val tile = board.getTile(currentPos) ?: return null
             wordText += tile.displayLetter
             wordTiles.add(currentPos to tile)
@@ -93,7 +93,7 @@ object WordFinder {
         return FoundWord(wordText, wordTiles, Direction.VERTICAL)
     }
 
-    fun findAllWordsFormedByMove(board: Board, placedTiles: Map<Position, Tile>): Set<FoundWord> {
+    fun findAllWordsFormedByMove(board: Board, placedTiles: Map<BoardPosition, Tile>): Set<FoundWord> {
         if (placedTiles.isEmpty()) return emptySet()
 
         val allFoundWords = mutableSetOf<FoundWord>()

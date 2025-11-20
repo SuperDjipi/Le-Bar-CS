@@ -100,10 +100,16 @@ class HomeViewModel @Inject constructor(
      */
     fun createGame() {
         viewModelScope.launch {
+            val playerId = uiState.value.localPlayerId
+            if (playerId == null) {
+                _uiState.update { it.copy(error = "L'ID du joueur local n'est pas encore chargé.") }
+                return@launch
+            }
+
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 // Délègue la logique de création de partie au Repository.
-                val gameId = gameRepository.createGame()
+                val gameId = gameRepository.createGame(creatorId = playerId)
                 // Si l'appel réussit, on met à jour l'état avec le nouvel ID de partie,
                 // ce qui déclenchera la navigation via le `LaunchedEffect` dans l'UI.
                 _uiState.update {

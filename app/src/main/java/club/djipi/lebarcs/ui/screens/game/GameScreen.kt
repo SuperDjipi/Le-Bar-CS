@@ -155,6 +155,7 @@ private fun GameLayout(
                 onPass = viewModel::onPass,
                 onUndoMove = viewModel::onUndoMove,
                 onShuffleRack = viewModel::onShuffleRack,
+                getValidDropBoardPositions = viewModel::getValidDropPositions,
                 modifier = modifier
             )
 

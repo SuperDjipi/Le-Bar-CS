@@ -7,6 +7,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
@@ -20,8 +21,9 @@ object RepositoryModule {
     fun provideGameRepository(
         // Le Repository a besoin de ces dépendances pour fonctionner
         webSocketClient: WebSocketClient,
-        @ApplicationScope externalScope: CoroutineScope
+        @ApplicationScope externalScope: CoroutineScope,
+        httpClient: HttpClient
     ): GameRepository {
-        return GameRepositoryImpl(webSocketClient, externalScope)
+        return GameRepositoryImpl(webSocketClient, externalScope, httpClient)
     }
 }

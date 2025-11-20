@@ -52,24 +52,11 @@ fun BoardView(
                 Row {
                     // Cases de la ligne
                     row.forEach { cell ->
-                        // La logique pour afficher les DroppableBoardCell et les TileView est parfaite.
-                        // On ne touche à rien ici.
                         DroppableBoardCell(
                             cell = cell,
                             dragDropManager = dragDropManager,
                             size = cellSize.dp
-                        ){
-                            // Le contenu de la lambda est parfait.
-                            val tile = cell.tile
-                            if (tile != null) {
-                                TileView(
-                                    tile = tile,
-                                    dragDropManager = dragDropManager,
-                                    source = DragSource.Board(cell.position),
-                                    enabled = !cell.isLocked
-                                )
-                                Log.d(TAG, "BoardView: $cell")
-                            }}
+                        )
                     }
                 }
             }

@@ -1,6 +1,6 @@
 // On commence par les plus petites briques
 
-export interface Position {
+export interface BoardPosition {
     row: number;
     col: number;
 }
@@ -17,7 +17,14 @@ export interface Tile {
 // Équivalent de la data class PlacedTile
 export interface PlacedTile {
     tile: Tile;
-    position: { row: number; col: number };
+    boardPosition: BoardPosition;
+}
+
+// Profil joueur
+export interface UserProfile {
+    id: string;
+    name: string;
+    hashedPassword: string;
 }
 
 // Équivalent de la data class Player
@@ -31,13 +38,14 @@ export interface Player {
 
 // Équivalent de l'enum GameStatus
 export enum GameStatus {
-    WAITING = "WAITING",
+    WAITING_FOR_PLAYERS = "WAITING_FOR_PLAYERS",
     PLAYING = "PLAYING",
     FINISHED = "FINISHED",
 }
 
 // Équivalent de la data class BoardCell et Board
 export interface BoardCell {
+    boardPosition: BoardPosition;
     bonus: string; // Ex: "LETTER_X2", "CENTER", "NONE"
     tile: Tile | null; // Le type 'Tile' ou 'null'
 }
@@ -61,8 +69,8 @@ export enum Direction {
 export interface FoundWord {
     text: string;
     direction: Direction;
-    tiles: { tile: Tile, position: Position }[];
-    start: Position;
+    tiles: { tile: Tile, boardPosition: BoardPosition }[];
+    start: BoardPosition;
 }
 
 

@@ -1,5 +1,3 @@
-// Dans : src/logic/TileBag.ts
-
 import type { Tile } from '../models/GameModels.js';
 
 // Configuration des tuiles en français

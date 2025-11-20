@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import club.djipi.lebarcs.shared.domain.model.BoardPosition
 import club.djipi.lebarcs.shared.domain.model.Tile
 
 private const val TAG = "DragDropManager"
@@ -29,16 +30,23 @@ class DragDropManager {
 
     // Chevalet : limites et enregistrement
     private var rackBounds: Rect? = null
+
     fun registerRackArea(bounds: Rect) {
         this.rackBounds = bounds
     }
 
-    fun startDrag(tile: Tile, source: DragSource, startCoordinates: Offset) {
+    fun startDrag(
+        tile: Tile,
+        source: DragSource,
+        startCoordinates: Offset,
+        validPositions: Set<BoardPosition> = emptySet()
+    ) {
         state = DragDropState(
             isDragging = true,
             draggedTile = tile,
             source = source,
-            currentCoordinates = startCoordinates
+            currentCoordinates = startCoordinates,
+            validDropBoardPositions = validPositions
         )
         Log.d(TAG, "startDrag: ${tile}, $source, $startCoordinates")
     }
@@ -49,9 +57,19 @@ class DragDropManager {
         }
     }
 
-    fun setTarget(newDropTarget: DropTarget?) {
+    fun setTarget(newDropTarget: DropTarget?, isValid: Boolean = true) {
         if (state.isDragging) {
-            state = state.copy(target = newDropTarget)
+            // Extraire la position pour la preview
+            val previewPos = when (newDropTarget) {
+                is DropTarget.Board -> newDropTarget.boardPosition
+                else -> null
+            }
+
+            state = state.copy(
+                target = newDropTarget,
+                ghostPreviewBoardPosition = previewPos,
+                isValidDrop = isValid
+            )
         }
     }
 
@@ -62,12 +80,9 @@ class DragDropManager {
             // Log de débogage plus précis
             Log.d(TAG, "Drop réussi de la tuile ${state.draggedTile?.letter} sur la cible ${state.target}")
         } else {
-            Log.d(TAG, "Drop annulé (pas de cible)")
+            Log.d(TAG, "Drop annulé (${if (!state.isValidDrop) "invalide" else "pas de cible"})")
         }
 
-        // 2. On met à jour l'état final.
-        // On garde les informations du drop (source, target, tile) pour que le LaunchedEffect puisse les lire.
-        // On met simplement isDragging à false et isDropped à true (si réussi).
         state = state.copy(
             isDragging = false,
             isDropped = isDropped

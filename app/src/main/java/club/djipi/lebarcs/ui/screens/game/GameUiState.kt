@@ -2,7 +2,7 @@ package club.djipi.lebarcs.ui.screens.game
 
 import club.djipi.lebarcs.shared.domain.logic.FoundWord
 import club.djipi.lebarcs.shared.domain.model.GameState
-import club.djipi.lebarcs.shared.domain.model.Position
+import club.djipi.lebarcs.shared.domain.model.BoardPosition
 
 /**
  * Définit tous les états possibles de l'interface utilisateur pour l'écran de jeu.
@@ -73,11 +73,11 @@ sealed class GameUiState {
         /**
          * L'utilisateur doit choisir une lettre pour un joker.
          *
-         * @param targetPosition Position sur le plateau où le joker a été placé
+         * @param targetBoardPosition Position sur le plateau où le joker a été placé
          * @param tileId ID unique de la tuile joker (pour la retrouver facilement)
          */
         data class Selecting(
-            val targetPosition: Position,
+            val targetBoardPosition: BoardPosition,
             val tileId: String
         ) : JokerSelectionState()
     }

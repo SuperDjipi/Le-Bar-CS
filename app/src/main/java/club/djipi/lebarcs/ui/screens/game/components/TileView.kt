@@ -1,10 +1,10 @@
 package club.djipi.lebarcs.ui.screens.game.components
 
 import android.util.Log
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import club.djipi.lebarcs.shared.domain.model.BoardPosition
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DragDropManager
 import club.djipi.lebarcs.ui.screens.game.dragdrop.DragSource
 import club.djipi.lebarcs.shared.domain.model.Tile
@@ -45,7 +46,8 @@ fun TileView(
     dragDropManager: DragDropManager? = null,
     source: DragSource? = null,
     onDragStart: () -> Unit = {},
-    onDragEnd: () -> Unit = {}
+    onDragEnd: () -> Unit = {},
+    getValidPositions: () -> Set<BoardPosition> = { emptySet() }
 ) {
     val backgroundColor = when {
         !enabled -> Color(0xFFCCCCCC)
@@ -67,7 +69,7 @@ fun TileView(
                 detectDragGestures(
                     onDragStart = { touchOffset ->
                         val initialCoordinates = tileCoordinates + touchOffset
-                        dragDropManager.startDrag(tile, source, initialCoordinates)
+                        dragDropManager.startDrag(tile, source, initialCoordinates,validPositions = getValidPositions())
                         onDragStart() // callback dans TileRack
                         Log.d(TAG,"DRAG START: Source=${source}, Pos=${initialCoordinates}.")
                     },
@@ -139,14 +141,23 @@ fun TileView(
  */
 @Composable
 fun EmptyTileSlot(
-    modifier: Modifier = Modifier,
-    size: Dp = 50.dp
+    size: Dp,
+    isHighlighted: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
+    val borderColor by animateColorAsState(
+        targetValue = if (isHighlighted) Color(0xFF00FF00) else Color(0x40FFFFFF),
+        label = "emptySlotBorder"
+    )
+
     Box(
         modifier = modifier
             .size(size)
-            .background(Color(0xFFE8E8E8), RoundedCornerShape(2.dp))
-            .border(1.dp, Color(0xFFCCCCCC), RoundedCornerShape(2.dp))
+            .border(
+                width = if (isHighlighted) 3.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(4.dp)
+            )
     )
 }
 

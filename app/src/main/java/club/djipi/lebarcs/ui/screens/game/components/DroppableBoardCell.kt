@@ -25,26 +25,34 @@ import club.djipi.lebarcs.ui.screens.game.dragdrop.DropTarget
 
 private const val TAG = "DroppableBoardCell"
 
+// Enum pour les états,visuels de case
+private enum class CellStatus {
+    Normal,           // Pas de drag en cours
+    ValidAvailable,   // Case disponible (pré-indication)
+    ValidTarget,      // Hover sur case valide
+    InvalidTarget     // Hover sur case invalide
+}
+
 @Composable
 fun DroppableBoardCell(
     cell: BoardCell,
     dragDropManager: DragDropManager? = null,
     modifier: Modifier = Modifier,
-    size: Dp = 35.dp,
-    content: @Composable BoxScope.() -> Unit
+    size: Dp = 35.dp
 ) {
     var cellPosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     val dragState = dragDropManager!!.state
     val localDensity = LocalDensity.current
 
-    // On crée UNE SEULE variable qui définit si la cellule est une cible de drop valide.
-    val isDropTarget by remember(dragState.isDragging, dragState.currentCoordinates, cell.tile) {
+    // Vérifier si cette case est dans les positions valides
+    val isValidPosition = dragState?.validDropBoardPositions?.contains(cell.boardPosition) == true
+
+    // Vérifier si la souris survole cette case
+    val isHovered by remember(dragState?.isDragging, dragState?.currentCoordinates, cell.tile) {
         derivedStateOf {
-            // Conditions pour être une cible : le drag est actif ET la cellule est vide
-            if (!dragState.isDragging || cell.tile != null) {
+            if (dragState?.isDragging != true || cell.tile != null) {
                 false
             } else {
-                // Et la souris est bien au-dessus de la cellule
                 val cellSize = with(localDensity) { size.toPx() }
                 val dragPos = dragState.currentCoordinates
                 dragPos.x >= cellPosition.x && dragPos.x <= cellPosition.x + cellSize &&
@@ -53,31 +61,45 @@ fun DroppableBoardCell(
         }
     }
 
-    // Animation de la bordure, ne dépend plus que de `isDropTarget`
+    // Déterminer le statut visuel de la case
+    val cellStatus = when {
+        dragState?.isDragging != true -> CellStatus.Normal
+        isHovered && isValidPosition -> CellStatus.ValidTarget
+        isHovered && !isValidPosition -> CellStatus.InvalidTarget
+        isValidPosition -> CellStatus.ValidAvailable
+        else -> CellStatus.Normal
+    }
+
+    // Animations basées sur le statut
     val borderColor by animateColorAsState(
-        targetValue = if (isDropTarget) Color(0xFF00FF00) else Color.Transparent,
+        targetValue = when (cellStatus) {
+            CellStatus.ValidTarget -> Color(0xFF00FF00)      // Vert : hover valide
+            CellStatus.InvalidTarget -> Color(0xFFFF0000)    // Rouge : hover invalide
+            CellStatus.ValidAvailable -> Color(0x8000FF00)   // Vert pâle : disponible
+            CellStatus.Normal -> Color.Transparent
+        },
         label = "borderColor"
     )
 
-    // Animation de l'échelle, ne dépend plus que de `isDropTarget`
     val scale by animateFloatAsState(
-        targetValue = if (isDropTarget) 1.1f else 1f,
+        targetValue = when (cellStatus) {
+            CellStatus.ValidTarget -> 1.15f
+            CellStatus.InvalidTarget -> 1.05f
+            CellStatus.ValidAvailable -> 1.03f
+            CellStatus.Normal -> 1f
+        },
         label = "scale"
     )
 
-    // Le LaunchedEffect devient beaucoup plus simple.
-    LaunchedEffect(isDropTarget) {
-        if (isDropTarget) {
-            // Si on est une cible, on se déclare.
-            dragDropManager.setTarget(DropTarget.Board(cell.position))
-            Log.d(TAG, "Cible valide définie : ${cell.position}")
-        } else {
-            // Si je ne suis PLUS une cible, je vérifie si j'étais la cible précédente.
-            // Si c'est le cas, et seulement dans ce cas, j'annule la cible.
-            if (dragDropManager.state.target == DropTarget.Board(cell.position)) {
-                dragDropManager.setTarget(null)
-                Log.d(TAG, "Cible annulée car plus survolée : ${cell.position}")
-            }
+    // Notifier le manager si on survole
+    LaunchedEffect(isHovered, isValidPosition) {
+        if (isHovered) {
+            dragDropManager?.setTarget(
+                DropTarget.Board(cell.boardPosition),
+                isValid = isValidPosition
+            )
+        } else if (dragDropManager?.state?.target == DropTarget.Board(cell.boardPosition)) {
+            dragDropManager.setTarget(null)
         }
     }
 
@@ -92,28 +114,42 @@ fun DroppableBoardCell(
             }
             // Le modifier de la bordure est aussi simplifié
             .border(
-                width = if (isDropTarget) 3.dp else 0.dp,
+                width = when (cellStatus) {
+                    CellStatus.ValidTarget, CellStatus.InvalidTarget -> 3.dp
+                    CellStatus.ValidAvailable -> 2.dp
+                    CellStatus.Normal -> 0.dp
+                },
                 color = borderColor,
                 shape = RoundedCornerShape(2.dp)
             )
     ) {
-        // On affiche soit la tuile, soit la cellule de fond.
-        // On utilise 'let' pour exécuter du code seulement si 'cell.tile' n'est pas null.
-        // 'it' à l'intérieur du bloc 'let' est garanti d'être non-null (type 'Tile').
+        // Ghost preview de la tuile
+        if (dragState?.ghostPreviewBoardPosition == cell.boardPosition &&
+            dragState.draggedTile != null &&
+            cell.tile == null
+        ) {
+            TileView(
+                tile = dragState.draggedTile!!,
+                size = size,
+                modifier = Modifier.graphicsLayer {
+                    alpha = 0.5f
+                    scaleX = 0.85f
+                    scaleY = 0.85f
+                }
+            )
+        }
+
+        // Contenu de la case
         cell.tile?.let { tile ->
             // S'il y a une tuile, on affiche TileView.
-            // 'tile' ici est de type 'Tile', pas 'Tile?'. L'erreur est résolue.
             TileView(
                 tile = tile,
                 size = size,
-                // On rend la tuile "draggable" pour permettre le déplacement depuis le plateau
                 dragDropManager = dragDropManager,
-                source = DragSource.Board(cell.position),
+                source = DragSource.Board(cell.boardPosition),
                 enabled = !cell.isLocked
             )
         } ?: run {
-            // Le '?: run' est l'équivalent du 'else'. Il s'exécute si 'cell.tile' EST null.
-            // S'il n'y a pas de tuile, on affiche la cellule de fond.
             BoardCellView(
                 cell = cell,
                 size = size
@@ -121,3 +157,4 @@ fun DroppableBoardCell(
         }
     }
 }
+
