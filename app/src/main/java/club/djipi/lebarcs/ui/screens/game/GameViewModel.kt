@@ -67,6 +67,21 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun onStartGame() {
+        viewModelScope.launch {
+            // Sécurité : on vérifie que c'est bien le tour de l'hôte, etc.
+            val currentState = uiState.value
+            if (currentState is GameUiState.Playing && currentState.isLocalPlayerHost) {
+                try {
+                    // On envoie l'objet 'StartGame' directement via le WebSocket.
+                    webSocketClient.sendEvent(ClientToServerEvent.StartGame)
+                    Log.d("GameViewModel", "Événement START_GAME envoyé au serveur.")
+                } catch (e: Exception) {
+                    Log.e("GameViewModel", "Erreur lors de l'envoi de START_GAME", e)
+                }
+            }
+        }
+    }
     /**
      * Lance le processus de connexion au serveur de jeu via WebSocket.
      * Appelée par le `LobbyScreen`.

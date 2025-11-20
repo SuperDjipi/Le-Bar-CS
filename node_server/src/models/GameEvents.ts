@@ -9,7 +9,9 @@ export interface JoinGameEvent {
         playerId: string;
     };
 }
-
+export interface StartGameEvent {
+    type: "START_GAME";
+}
 export interface PlayMoveEvent {
     type: "PLAY_MOVE";
     payload: {
@@ -26,7 +28,7 @@ export interface RegisterProfileEvent {
 // ... (on pourra ajouter PassTurnEvent, ShuffleEvent, etc. plus tard)
 
 // Un type qui représente tous les événements possibles venant du client
-export type ClientToServerEvent = JoinGameEvent | PlayMoveEvent | RegisterProfileEvent;
+export type ClientToServerEvent = JoinGameEvent | StartGameEvent | PlayMoveEvent | RegisterProfileEvent;
 
 
 // --- Événements que le SERVEUR envoie au CLIENT ---

@@ -50,18 +50,18 @@ function initGameConnections(gameId: string) {
         connections.set(gameId, new Map<string, WebSocket>());
     }
 }
-    /**
-     * Génère un code de partie simple de 4 lettres majuscules.
-     */
-    function generateGameCode(): string {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        let code = '';
-        for (let i = 0; i < 4; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        // TODO: Plus tard, on vérifiera que ce code n'est pas déjà utilisé.
-        return code;
+/**
+ * Génère un code de partie simple de 4 lettres majuscules.
+ */
+function generateGameCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+    // TODO: Plus tard, on vérifiera que ce code n'est pas déjà utilisé.
+    return code;
+}
 
 
 /**
@@ -86,6 +86,50 @@ function prepareStateForPlayer(gameState: GameState, playerId: string): { stateF
         tileBag: [] // On ne révèle jamais la pioche au client
     };
     return { stateForPlayer, playerRack };
+}
+
+
+/**
+ * Diffuse (broadcast) un nouvel état de jeu à tous les joueurs connectés
+ * à une partie spécifique. Chaque joueur reçoit une version personnalisée de l'état.
+ *
+ * @param gameId L'ID de la partie à notifier.
+ * @param gameState L'état de jeu complet et officiel (avec tous les chevalets).
+ */
+function broadcastGameState(gameId: string, gameState: GameState) {
+    const gameConnections = connections.get(gameId);
+    if (!gameConnections) {
+        console.warn(`Tentative de diffusion à une partie inexistante ou sans connexions : ${gameId}`);
+        return;
+    }
+
+    console.log(`📣 Diffusion du nouvel état pour la partie ${gameId} à ${gameConnections.size} joueur(s)...`);
+
+    // On boucle sur tous les joueurs définis dans le GameState
+    gameState.players.forEach(player => {
+        const clientWs = gameConnections.get(player.id);
+
+        // On vérifie si ce joueur est bien connecté
+        if (clientWs && clientWs.readyState === WebSocket.OPEN) {
+            // 1. On prépare la version de l'état spécifique à ce joueur
+            const { stateForPlayer, playerRack } = prepareStateForPlayer(gameState, player.id);
+
+            // 2. On construit l'événement de mise à jour
+            const updateEvent: ServerToClientEvent = {
+                type: "GAME_STATE_UPDATE",
+                payload: {
+                    gameState: stateForPlayer,
+                    playerRack: playerRack // Le chevalet privé est envoyé ici
+                }
+            };
+
+            // 3. On envoie l'événement au client
+            clientWs.send(JSON.stringify(updateEvent));
+            console.log(`   - État envoyé à ${player.name} (${player.id})`);
+        } else {
+            console.log(`   - Joueur ${player.name} non connecté, envoi ignoré.`);
+        }
+    });
 }
 
 // --- DÉMARRAGE DU SERVEUR ---
@@ -194,14 +238,14 @@ async function startServer() {
         console.log(`✅ Nouvelle partie créée par ${creatorProfile.name}. Code: ${gameId}`);
 
         // 5. Renvoyer une réponse de succès au client
-        res.status(201).send({ 
+        res.status(201).send({
             message: "Partie créée avec succès !",
-            gameId: gameId 
+            gameId: gameId
         });
     });
 
     // --- FIN DE L'API DE CRÉATION DE PARTIE ---
-    
+
 
     // --- LOGIQUE PRINCIPALE DE CONNEXION ---
 
@@ -249,7 +293,44 @@ async function startServer() {
         ws.on('message', (message) => {
             try {
                 const event: ClientToServerEvent = JSON.parse(message.toString());
-             // Aiguillage des événements reçus du client
+                // Début de partie
+
+                if (event.type === "START_GAME") {
+                    const currentGame = games.get(gameId)!;
+
+                    // Sécurité : on vérifie que c'est bien l'hôte qui demande le démarrage
+                    const hostId = currentGame.players[0]?.id;
+                    if (playerId !== hostId) {
+                        // Optionnel : renvoyer une erreur au joueur qui n'est pas l'hôte
+                        return;
+                    }
+
+                    // --- LOGIQUE DE DÉMARRAGE ET TIRAGE AU SORT ---
+                    // 1. On mélange la liste des joueurs
+                    const shuffledPlayers = currentGame.players.sort(() => Math.random() - 0.5);
+
+                    // 2. On pioche les tuiles pour chaque joueur
+                    let currentTileBag = currentGame.tileBag;
+                    const playersWithTiles = shuffledPlayers.map(player => {
+                        const { drawnTiles, newBag } = drawTiles(currentTileBag, 7);
+                        currentTileBag = newBag;
+                        return { ...player, rack: drawnTiles };
+                    });
+
+                    // 3. On crée le nouvel état de jeu
+                    const nextGameState: GameState = {
+                        ...currentGame,
+                        players: playersWithTiles,
+                        tileBag: currentTileBag,
+                        status: GameStatus.PLAYING, // La partie commence !
+                        currentPlayerIndex: 0 // Le premier joueur de la liste mélangée commence
+                    };
+
+                    // 4. On sauvegarde et on diffuse le nouvel état à TOUT LE MONDE
+                    games.set(gameId, nextGameState);
+                    broadcastGameState(gameId, nextGameState); // Une fonction qui envoie l'état à tous les joueurs
+                }
+                // Aiguillage des événements reçus du client
                 if (event.type === "PLAY_MOVE") {
                     const currentGame = games.get(gameId)!;
                     const { placedTiles } = event.payload;

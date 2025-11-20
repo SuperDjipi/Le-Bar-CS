@@ -65,6 +65,13 @@ sealed class GameUiState {
          */
         val isLocalPlayerTurn: Boolean
             get() = gameData.players.getOrNull(gameData.currentPlayerIndex)?.id == localPlayerId
+
+        /**
+         * Propriété calculée qui indique si le joueur local est l'hôte de la partie.
+         * Par convention, l'hôte est le premier joueur dans la liste.
+         */
+        val isLocalPlayerHost: Boolean
+            get() = gameData.players.firstOrNull()?.id == localPlayerId
     }
     /**
      * État représentant la sélection d'une lettre pour un joker.

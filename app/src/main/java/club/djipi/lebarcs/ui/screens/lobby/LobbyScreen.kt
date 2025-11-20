@@ -45,7 +45,10 @@ fun LobbyScreen(
     // arrête la collecte de l'état lorsque l'UI n'est plus visible, économisant ainsi
     // les ressources.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
+    val isHost = (uiState as? GameUiState.Playing)?.let {
+        // L'hôte est le premier joueur de la liste
+        it.gameData.players.firstOrNull()?.id == it.localPlayerId
+    } ?: false
     // Interface utilisateur simple pour la salle d'attente.
     Column(
         modifier = Modifier
@@ -86,13 +89,18 @@ fun LobbyScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = onNavigateToGame,
+            onClick = { viewModel.onStartGame() },
             // Le bouton pour "Commencer" n'est activé que lorsque la connexion est
             // un succès et que le ViewModel a reçu et traité l'état initial du jeu
             // (c'est-à-dire, quand l'état est `GameUiState.Playing`).
-            enabled = uiState is GameUiState.Playing
+            enabled = uiState is GameUiState.Playing &&
+                    (uiState as GameUiState.Playing).gameData.players.size > 1 &&
+                    isHost
         ) {
             Text("Commencer la partie")
+        }
+        if (uiState is GameUiState.Playing && !isHost) {
+            Text("En attente que l'hôte (${(uiState as GameUiState.Playing).gameData.players.firstOrNull()?.name}) lance la partie...")
         }
     }
 }

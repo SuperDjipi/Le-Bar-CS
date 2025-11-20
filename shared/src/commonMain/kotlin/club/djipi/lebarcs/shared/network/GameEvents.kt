@@ -29,10 +29,25 @@ sealed class ClientToServerEvent {
     @SerialName("JOIN_GAME")
     data class JoinGame(val gameId: String, val playerId: String) : ClientToServerEvent()
 
+    /**
+     * Événement envoyé par l'hôte de la partie pour lancer le jeu
+     * depuis le lobby.
+     */
+    @Serializable
+    @SerialName("START_GAME")
+    object StartGame : ClientToServerEvent()
+
     /** Le client propose de jouer un coup. */
     @Serializable
     @SerialName("PLAY_MOVE")
     data class PlayMove(val payload: PlayMovePayload) : ClientToServerEvent()
+
+    /**
+     * Événement envoyé par le client pour passer son tour.
+     */
+    @Serializable
+    @SerialName("PASS_TURN")
+    object PassTurn : ClientToServerEvent()
 
     /**
      * Événement envoyé par le client pour enregistrer ou mettre à jour
