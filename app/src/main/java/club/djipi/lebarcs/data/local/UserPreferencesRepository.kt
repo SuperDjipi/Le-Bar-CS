@@ -1,55 +1,68 @@
 package club.djipi.lebarcs.data.local
 
-import android.util.Log
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.firstOrNull
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// Le DataStore est défini une seule fois au niveau du fichier. C'est parfait.
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
-
-// On définit les clés
-private val LOCAL_PLAYER_ID_KEY = stringPreferencesKey("local_player_id")
-private val LOCAL_PLAYER_NAME_KEY = stringPreferencesKey("local_player_name")
 
 @Singleton
 class UserPreferencesRepository @Inject constructor(@ApplicationContext private val context: Context) {
 
-    private val localPlayerIdKey = stringPreferencesKey("local_player_id")
-    // On crée un Flow qui observe les changements du nom.
-    val playerName: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[LOCAL_PLAYER_NAME_KEY]
+    // On définit les clés de manière privée et statique. C'est une bonne pratique.
+    private object PreferencesKeys {
+        val PLAYER_ID = stringPreferencesKey("local_player_id")
+        val PLAYER_NAME = stringPreferencesKey("local_player_name")
     }
 
-    suspend fun savePlayerName(name: String) {
+    suspend fun createAndSaveNewProfile(name: String, playerId: String) {
         context.dataStore.edit { settings ->
-            settings[LOCAL_PLAYER_NAME_KEY] = name
+            settings[PreferencesKeys.PLAYER_ID] = playerId
+            settings[PreferencesKeys.PLAYER_NAME] = name
         }
+        Log.d("UserPrefs", "Profil sauvegardé localement -> Nom: $name, ID: $playerId")
     }
 
-    suspend fun getLocalPlayerId(): String {
-        val preferences = context.dataStore.data.first()
-        var playerId = preferences[localPlayerIdKey]
-
-        if (playerId == null) {
-            // Si l'ID n'existe pas, on en crée un et on le sauvegarde
-            playerId = UUID.randomUUID().toString()
-            context.dataStore.edit { settings ->
-                settings[localPlayerIdKey] = playerId
-            }
-            Log.d("UserPrefs", "Nouvel ID joueur local créé et sauvegardé : $playerId")
-        } else {
+    /**
+     * Récupère l'ID du joueur local sauvegardé, SANS en créer un nouveau.
+     * @return L'ID du joueur s'il existe, sinon null.
+     */
+    suspend fun getLocalPlayerId(): String? {
+        // .firstOrNull() est plus sûr, il retourne null si le Flow est vide,
+        // ce qui ne devrait pas arriver, mais c'est une bonne pratique.
+        val preferences = context.dataStore.data.firstOrNull()
+        val playerId = preferences?.get(PreferencesKeys.PLAYER_ID)
+        if (playerId != null) {
             Log.d("UserPrefs", "ID joueur local existant chargé : $playerId")
+        } else {
+            Log.d("UserPrefs", "Aucun ID joueur local trouvé.")
         }
         return playerId
     }
+
+    /**
+     * Récupère le nom du joueur local sauvegardé.
+     * @return Le nom du joueur s'il existe, sinon null.
+     */
+    suspend fun getPlayerName(): String? {
+        val preferences = context.dataStore.data.firstOrNull()
+        val playerName = preferences?.get(PreferencesKeys.PLAYER_NAME)
+        if (playerName != null) {
+            Log.d("UserPrefs", "Nom joueur local existant chargé : $playerName")
+        } else {
+            Log.d("UserPrefs", "Aucun nom de joueur local trouvé.")
+        }
+        return playerName
+    }
 }
+

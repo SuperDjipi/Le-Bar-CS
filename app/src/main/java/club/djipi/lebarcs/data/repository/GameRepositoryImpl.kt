@@ -25,6 +25,9 @@ private data class CreateGameRequest(val creatorId: String)
 @Serializable
 private data class CreateGameResponse(val gameId: String)
 
+@Serializable
+private data class JoinGameRequest(val playerId: String)
+
 class GameRepositoryImpl @Inject constructor(
     private val webSocketClient: WebSocketClient,
     // On injecte un scope de coroutine qui vivra aussi longtemps que l'application
@@ -50,6 +53,19 @@ class GameRepositoryImpl @Inject constructor(
     }
 
     override fun getEvents(): Flow<ServerToClientEvent> = _events.asSharedFlow()
+
+    override suspend fun joinGame(gameId: String, playerId: String) {
+        try {
+            httpClient.post("http://djipi.club:8080/api/games/$gameId/join") {
+                contentType(ContentType.Application.Json)
+                setBody(JoinGameRequest(playerId = playerId))
+            }
+            println("GameRepository: Demande pour rejoindre la partie $gameId envoyée.")
+        } catch (e: Exception) {
+            println("GameRepository: Erreur pour rejoindre la partie: ${e.message}")
+            throw e
+        }
+    }
 
     override suspend fun sendPlayMove(placedTiles: List<PlacedTile>) {
         val payload = PlayMovePayload( placedTiles )

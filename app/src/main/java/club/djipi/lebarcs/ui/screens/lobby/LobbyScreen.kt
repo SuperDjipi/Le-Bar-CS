@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import club.djipi.lebarcs.shared.domain.model.GameStatus
 import club.djipi.lebarcs.ui.screens.game.GameUiState
 import club.djipi.lebarcs.ui.screens.game.GameViewModel
 
@@ -47,8 +48,23 @@ fun LobbyScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isHost = (uiState as? GameUiState.Playing)?.let {
         // L'hôte est le premier joueur de la liste
-        it.gameData.players.firstOrNull()?.id == it.localPlayerId
+        it.gameData.hostId == it.localPlayerId
     } ?: false
+    /**
+     * Cet effet est lancé chaque fois que 'uiState' change.
+     * Il observe le statut du jeu et déclenche la navigation automatiquement
+     * lorsque la partie commence.
+     */
+    LaunchedEffect(uiState) {
+        // On vérifie si l'état est 'Playing' et si le statut du jeu est 'PLAYING'.
+        if (uiState is GameUiState.Playing &&
+            (uiState as GameUiState.Playing).gameData.status == GameStatus.PLAYING) {
+
+            // La partie a commencé ! On navigue vers l'écran de jeu.
+            println("LobbyScreen: Le statut de la partie est PLAYING. Navigation vers GameScreen...")
+            onNavigateToGame()
+        }
+    }
     // Interface utilisateur simple pour la salle d'attente.
     Column(
         modifier = Modifier
@@ -100,7 +116,7 @@ fun LobbyScreen(
             Text("Commencer la partie")
         }
         if (uiState is GameUiState.Playing && !isHost) {
-            Text("En attente que l'hôte (${(uiState as GameUiState.Playing).gameData.players.firstOrNull()?.name}) lance la partie...")
+            Text("En attente que l'hôte (${(uiState as GameUiState.Playing).gameData.players[0].name}) lance la partie...")
         }
     }
 }

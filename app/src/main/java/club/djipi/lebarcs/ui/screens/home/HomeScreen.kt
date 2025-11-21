@@ -104,13 +104,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = {
-                        // On s'assure que le playerId (chargé en arrière-plan) est disponible avant de naviguer.
-                        val playerId = uiState.localPlayerId
-                        if (playerId != null) {
-                            onNavigateToLobby(uiState.gameIdInput, playerId)
-                        }
-                    },
+                    onClick = { viewModel.joinGame() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),

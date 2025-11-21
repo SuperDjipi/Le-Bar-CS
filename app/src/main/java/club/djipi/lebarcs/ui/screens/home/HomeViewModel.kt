@@ -12,6 +12,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.call.body
+import io.ktor.http.*
+import kotlinx.serialization.Serializable
+
+// --- DÉFINIR LES MODÈLES POUR L'APPEL API ---
+@Serializable
+private data class RegisterRequest(val name: String, val password: String)
+
+@Serializable
+private data class RegisterResponse(val message: String, val playerId: String)
+
 
 /**
  * La `data class` qui représente l'intégralité de l'état de l'écran d'accueil (`HomeScreen`).
@@ -50,7 +63,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val gameRepository: GameRepository
+    private val gameRepository: GameRepository,
+    private val httpClient: HttpClient
 ) : ViewModel() {
 
     /**
@@ -67,31 +81,35 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Le bloc d'initialisation, exécuté une seule fois lors de la création du ViewModel.
-     * Son rôle est de lancer les tâches de fond initiales, comme la vérification
-     * de l'identité du joueur.
+     * Charge l'identité complète du joueur (ID et Nom) en une seule opération.
      */
     init {
-        // On lance une coroutine dans le scope du ViewModel, qui sera automatiquement
-        // annulée lorsque le ViewModel sera détruit.
         viewModelScope.launch {
-            // Tâche 1 : Observer le nom du joueur en continu.
-            // `collect` est une fonction suspendue qui écoute les émissions du Flow.
-            userPreferencesRepository.playerName.collect { name ->
-                if (name == null) {
-                    // Si le nom n'est pas trouvé dans le DataStore, on met l'état
-                    // pour demander l'inscription à l'utilisateur.
-                    _uiState.update { it.copy(requiresOnboarding = true, playerName = null) }
+            // On lance une seule coroutine pour gérer tout le chargement initial.
+
+            // 1. On récupère les deux informations de manière séquentielle.
+            //    Comme ce sont des appels `suspend`, la coroutine attendra la fin de chaque
+            //    appel avant de passer au suivant.
+            val localPlayerId = userPreferencesRepository.getLocalPlayerId()
+            val playerName = userPreferencesRepository.getPlayerName()
+
+            // 2. On met à jour l'état de l'UI UNE SEULE FOIS avec toutes les informations.
+            _uiState.update { currentState ->
+                if (localPlayerId != null && playerName != null) {
+                    // Si le joueur est déjà connu, on met à jour son profil complet.
+                    currentState.copy(
+                        localPlayerId = localPlayerId,
+                        playerName = playerName,
+                        requiresOnboarding = false // Le joueur n'a pas besoin de s'inscrire.
+                    )
                 } else {
-                    // Sinon, on met à jour l'état avec le nom du joueur.
-                    _uiState.update { it.copy(requiresOnboarding = false, playerName = name) }
+                    // Si une des informations est manquante, c'est un nouvel utilisateur.
+                    currentState.copy(
+                        requiresOnboarding = true // On affiche l'écran d'inscription.
+                    )
                 }
             }
-        }
-        viewModelScope.launch {
-            // Tâche 2 : Récupérer l'ID persistant du joueur.
-            // C'est essentiel pour que la navigation puisse fonctionner.
-            val playerId = userPreferencesRepository.getLocalPlayerId()
-            _uiState.update { it.copy(localPlayerId = playerId) }
+            Log.d("HomeViewModel", "Chargement initial terminé. PlayerID: $localPlayerId, PlayerName: $playerName")
         }
     }
 
@@ -137,29 +155,74 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(gameIdInput = newValue.uppercase()) }
     }
 
+    fun joinGame() {
+        viewModelScope.launch {
+            val gameId = uiState.value.gameIdInput
+            val playerId = uiState.value.localPlayerId
+
+            if (gameId.isBlank() || playerId == null) {
+                _uiState.update { it.copy(error = "Le code de la partie et l'ID joueur sont requis.") }
+                return@launch
+            }
+
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                gameRepository.joinGame(gameId, playerId)
+                // Si l'appel réussit, on déclenche la navigation
+                _uiState.update { it.copy(isLoading = false, createdGameId = gameId) } // On réutilise 'createdGameId' pour la navigation
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "Impossible de rejoindre la partie : ${e.message}") }
+            }
+        }
+    }
+
     /**
-     * Enregistre le nom de l'utilisateur lors de la première inscription.
+     * Gère la soumission du formulaire d'inscription (onboarding).
+     * 1. Sauvegarde le nouveau profil (ID et Nom) localement.
+     * 2. Enregistre ce nouveau profil sur le serveur via l'API REST.
+     * 3. Met à jour l'état de l'UI pour passer à l'écran principal.
      */
     fun submitOnboarding(name: String) {
         viewModelScope.launch {
             if (name.isNotBlank()) {
-                // On sauvegarde le nom dans le DataStore via le repository.
-                userPreferencesRepository.savePlayerName(name)
-                // 2. On récupère l'ID du joueur local
-                val playerId = userPreferencesRepository.getLocalPlayerId()
-                // L'observation continue (le `collect` dans `init`) se chargera
-                // automatiquement de mettre à jour l'UI et de faire disparaître l'écran d'inscription.
+                _uiState.update { it.copy(isLoading = true, error = null) }
+                try {
+                    // Pour l'instant, on utilise un mot de passe factice.
+                    // Plus tard, vous pourrez ajouter un champ pour cela dans l'UI.
+                    val dummyPassword = "password123"
 
-                // --- Logique d'envoi au serveur ---
-                // TODO: Créer un service/repository pour gérer cet appel.
-                // Exemple conceptuel :
-                // val payload = RegisterProfilePayload(name = name)
-                // val event = ClientToServerEvent.RegisterProfile(payload)
-                // userRepository.registerProfile(playerId, event)
-                Log.d("HomeViewModel", "TODO: Envoyer le profil (nom: $name, id: $playerId) au serveur.")
-                // ------------------------------------
+                    // 1. On appelle l'API du serveur pour enregistrer le profil.
+                    Log.d("HomeViewModel", "Tentative d'enregistrement du profil sur le serveur pour : $name")
+                    val response: RegisterResponse = httpClient.post("http://djipi.club:8080/api/register") {
+                        contentType(ContentType.Application.Json)
+                        setBody(RegisterRequest(name = name, password = dummyPassword))
+                    }.body()
+
+                    // L'API a répondu avec succès. L'ID du joueur est celui généré par le serveur.
+                    val newPlayerId = response.playerId
+                    Log.d("HomeViewModel", "Profil enregistré sur le serveur. PlayerID reçu : $newPlayerId")
+
+                    // 2. On sauvegarde ce profil (ID et Nom) localement sur l'appareil.
+                    userPreferencesRepository.createAndSaveNewProfile(name, newPlayerId)
+
+                    // 3. On met à jour l'état de l'UI pour refléter le succès.
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            localPlayerId = newPlayerId,
+                            playerName = name,
+                            requiresOnboarding = false // L'inscription est terminée !
+                        )
+                    }
+
+                } catch (e: Exception) {
+                    // Gérer les erreurs (pseudo déjà pris, serveur inaccessible, etc.)
+                    Log.e("HomeViewModel", "Erreur lors de l'inscription :", e)
+                    _uiState.update { it.copy(isLoading = false, error = "Erreur lors de l'inscription : ${e.message}") }
+                }
             }
-        }    }
+        }
+    }
 
     /**
      * Réinitialise l'ID de la partie créée pour éviter les re-navigations automatiques.

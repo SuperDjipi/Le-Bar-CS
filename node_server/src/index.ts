@@ -18,10 +18,11 @@ import { GameStatus } from './models/GameModels.js';
 // Import des modules de logique métier
 import { createTileBag, drawTiles } from './logic/TileBag.js';
 import { createEmptyBoard, createNewBoard } from './models/BoardModels.js';
-import { processPlayMove } from './logic/GameEngine.js'; // Le moteur de jeu principal
+import { gameStateToString } from './models/toStrings.js';
 import { URL } from 'url'; // Utile pour parser l'URL de connexion
 import { v4 as generateUUID } from 'uuid';
 import { initializeDatabase } from './db/database.js';
+import { handleNewConnection } from './services/webSocketManager.js';
 
 // --- GESTION DES PARTIES EN MÉMOIRE ---
 
@@ -30,7 +31,7 @@ import { initializeDatabase } from './db/database.js';
  * C'est une Map qui associe un identifiant de partie (`gameId`) à son état complet (`GameState`).
  * NOTE : Ces données sont volatiles et seront perdues si le serveur redémarre.
  */
-const games = new Map<string, GameState>();
+export const games = new Map<string, GameState>();
 
 /**
  * La gestion des connexions WebSocket actives.
@@ -40,12 +41,12 @@ const games = new Map<string, GameState>();
  * - La valeur est une autre Map qui associe l'ID d'un joueur (`playerId`) à son instance WebSocket.
  * Cela nous permet de savoir qui est qui et d'envoyer des messages ciblés.
  */
-const connections = new Map<string, Map<string, WebSocket>>();
+export const connections = new Map<string, Map<string, WebSocket>>();
 
 /**
  * Initialise le conteneur de connexions pour une partie donnée si ce n'est pas déjà fait.
  */
-function initGameConnections(gameId: string) {
+export function initGameConnections(gameId: string) {
     if (!connections.has(gameId)) {
         connections.set(gameId, new Map<string, WebSocket>());
     }
@@ -73,7 +74,7 @@ function generateGameCode(): string {
  * @param playerId L'ID du joueur pour qui l'état est préparé.
  * @returns Un objet contenant l'état "public" et le chevalet privé du joueur.
  */
-function prepareStateForPlayer(gameState: GameState, playerId: string): { stateForPlayer: GameState, playerRack: Tile[] } {
+export function prepareStateForPlayer(gameState: GameState, playerId: string): { stateForPlayer: GameState, playerRack: Tile[] } {
     let playerRack: Tile[] = [];
     const stateForPlayer: GameState = {
         ...gameState,
@@ -96,7 +97,7 @@ function prepareStateForPlayer(gameState: GameState, playerId: string): { stateF
  * @param gameId L'ID de la partie à notifier.
  * @param gameState L'état de jeu complet et officiel (avec tous les chevalets).
  */
-function broadcastGameState(gameId: string, gameState: GameState) {
+export function broadcastGameState(gameId: string, gameState: GameState) {
     const gameConnections = connections.get(gameId);
     if (!gameConnections) {
         console.warn(`Tentative de diffusion à une partie inexistante ou sans connexions : ${gameId}`);
@@ -189,6 +190,70 @@ async function startServer() {
     });
     // --- FIN DE L'API D'INSCRIPTION ---
 
+    /**
+     * Route API pour permettre à un joueur de rejoindre une partie existante.
+     * Attend une requête POST sur /api/games/:gameId/join
+     * @param gameId L'ID de la partie à rejoindre (dans l'URL).
+     * @body { "playerId": "xxxx-yyyy-zzzz" }
+     */
+    app.post('/api/games/:gameId/join', async (req, res) => {
+        const { gameId } = req.params; // On récupère l'ID de la partie depuis l'URL
+        const { playerId } = req.body; // On récupère l'ID du joueur depuis le corps de la requête
+
+        if (!playerId) {
+            return res.status(400).send({ message: "L'ID du joueur est requis." });
+        }
+
+        const game = games.get(gameId.toUpperCase());
+
+        // 1. Vérifications de base
+        if (!game) {
+            return res.status(404).send({ message: "Partie non trouvée." }); // 404 Not Found
+        }
+        if (game.status !== GameStatus.WAITING_FOR_PLAYERS) {
+            return res.status(403).send({ message: "Cette partie a déjà commencé ou est terminée." }); // 403 Forbidden
+        }
+        if (game.players.some(p => p.id === playerId)) {
+            // Le joueur est déjà dans la partie, on le laisse juste continuer.
+            console.log(`ℹ️ Le joueur ${playerId} tente de rejoindre une partie où il est déjà.`);
+            return res.status(200).send({ message: "Vous êtes déjà dans la partie.", gameId: game.id });
+        }
+
+        try {
+            // 2. Récupérer le profil du joueur depuis la base de données
+            const userProfile = await db.get('SELECT * FROM users WHERE id = ?', playerId);
+            if (!userProfile) {
+                return res.status(404).send({ message: "Profil joueur non trouvé dans la base de données." });
+            }
+
+            // 3. Ajouter le joueur à l'état de la partie
+            const newPlayer: Player = {
+                id: userProfile.id,
+                name: userProfile.name,
+                score: 0,
+                rack: [],
+                isActive: false
+            };
+            const updatedPlayers = [...game.players, newPlayer];
+            const updatedGame = { ...game, players: updatedPlayers };
+
+            // 4. Mettre à jour l'état de la partie en mémoire
+            games.set(gameId.toUpperCase(), updatedGame);
+
+            console.log(`✅ Le joueur ${userProfile.name} a rejoint la partie ${gameId.toUpperCase()}`);
+
+            // 5. NOTIFIER TOUT LE MONDE en temps réel !
+            // On utilise la fonction 'broadcastGameState' que nous avons créée.
+            broadcastGameState(gameId.toUpperCase(), updatedGame);
+
+            // 6. Renvoyer une réponse de succès au joueur qui vient de rejoindre
+            res.status(200).send({ message: "Vous avez rejoint la partie avec succès !", gameId: game.id });
+
+        } catch (error) {
+            console.error("Erreur pour rejoindre la partie:", error);
+            res.status(500).send({ message: "Erreur interne du serveur." });
+        }
+    });
     // --- DÉBUT DE L'API DE CRÉATION DE PARTIE ---
     /**
      * Route API pour créer une nouvelle partie.
@@ -196,52 +261,58 @@ async function startServer() {
      * Le corps de la requête doit contenir l'ID du joueur qui crée la partie.
      * @body { "creatorId": "xxxx-yyyy-zzzz" }
      */
-    app.post('/api/games', (req, res) => {
+    app.post('/api/games', async (req, res) => {
         const { creatorId } = req.body;
 
         if (!creatorId) {
             return res.status(400).send({ message: "L'ID du créateur est requis." });
         }
+        try {
+            // 1. Générer un code de partie simple et unique
+            const gameId = generateGameCode();
 
-        // 1. Générer un code de partie simple et unique
-        const gameId = generateGameCode(); // On va créer cette fonction
+            // 2. Récupérer le VRAI profil du créateur depuis la base de données
+            const creatorProfile = await db.get<UserProfile>('SELECT * FROM users WHERE id = ?', creatorId);
+            if (!creatorProfile) {
+                return res.status(404).send({ message: "Profil du créateur non trouvé." });
+            }
 
+            // 3. Créer le nouvel état de la partie
+            const newGame: GameState = {
+                id: gameId,
+                hostId: creatorId,
+                board: createEmptyBoard(),
+                players: [
+                    {
+                        id: creatorProfile.id,
+                        name: creatorProfile.name,
+                        score: 0,
+                        rack: [], // Le chevalet sera rempli plus tard, au démarrage
+                        isActive: true
+                    }
+                ],
+                tileBag: createTileBag(),
+                status: GameStatus.WAITING_FOR_PLAYERS,
+                moves: [],
+                turnNumber: 1,
+                currentPlayerIndex: 0,
+            };
 
-        // 2. Récupérer le profil du créateur depuis la base de données
-        // TODO: Pour l'instant, on crée un joueur factice. Plus tard, on le récupérera de la DB.
-        const creatorProfile = { id: creatorId, name: "Hôte" }; // Version temporaire
+            // 4. Sauvegarder la nouvelle partie en mémoire
+            games.set(gameId, newGame);
+            initGameConnections(gameId); // On prépare le "salon" WebSocket pour cette partie
 
-        // 3. Créer le nouvel état de la partie
-        const newGame: GameState = {
-            id: gameId,
-            board: createEmptyBoard(),
-            players: [
-                {
-                    id: creatorProfile.id,
-                    name: creatorProfile.name,
-                    score: 0,
-                    rack: [], // Le chevalet sera rempli plus tard, au démarrage
-                    isActive: true
-                }
-            ],
-            tileBag: createTileBag(),
-            status: GameStatus.WAITING_FOR_PLAYERS,
-            moves: [],
-            turnNumber: 1,
-            currentPlayerIndex: 0,
-        };
+            console.log(`✅ Nouvelle partie créée par ${creatorProfile.name}. Code: ${gameId}`);
 
-        // 4. Sauvegarder la nouvelle partie en mémoire
-        games.set(gameId, newGame);
-        initGameConnections(gameId); // On prépare le "salon" WebSocket pour cette partie
-
-        console.log(`✅ Nouvelle partie créée par ${creatorProfile.name}. Code: ${gameId}`);
-
-        // 5. Renvoyer une réponse de succès au client
-        res.status(201).send({
-            message: "Partie créée avec succès !",
-            gameId: gameId
-        });
+            // 5. Renvoyer une réponse de succès au client
+            res.status(201).send({
+                message: "Partie créée avec succès !",
+                gameId: gameId
+            });
+        } catch (error) {
+            console.error("Erreur lors de la création de la partie:", error);
+            res.status(500).send({ message: "Erreur interne du serveur." });
+        }
     });
 
     // --- FIN DE L'API DE CRÉATION DE PARTIE ---
@@ -252,134 +323,7 @@ async function startServer() {
     /**
      * Ce bloc est exécuté à chaque fois qu'un nouveau client établit une connexion WebSocket.
      */
-    wss.on('connection', (ws, req) => {
-        // On parse l'URL pour extraire le gameId et le playerId
-        const requestUrl = new URL(req.url!, `http://${req.headers.host}`);
-        const gameId = requestUrl.pathname.split('/').pop()?.split('?')[0]; // Extrait l'ID de la partie de l'URL
-        const playerId = requestUrl.searchParams.get('playerId'); // Extrait l'ID du joueur des paramètres de l'URL
-
-        // Sécurité : on vérifie que les informations sont valides
-        if (!gameId || !playerId || !games.has(gameId)) {
-            console.log(`❌ Tentative de connexion invalide: gameId=${gameId}, playerId=${playerId}`);
-            ws.close();
-            return;
-        }
-
-        const gameConnections = connections.get(gameId)!;
-
-        // On associe l'instance WebSocket au joueur
-        gameConnections.set(playerId, ws);
-        console.log(`Joueur ${playerId} vient de se connecter à la partie ${gameId}.`);
-
-        // --- ENVOI DE L'ÉTAT INITIAL ---
-        console.log(`Début d'envoi`);
-        const initialGameState = games.get(gameId)!;
-        const { stateForPlayer, playerRack } = prepareStateForPlayer(initialGameState, playerId);
-
-        console.log(`Avant d'envoyer ${JSON.stringify(stateForPlayer)}`);
-        const welcomeEvent: ServerToClientEvent = {
-            type: "GAME_STATE_UPDATE",
-            payload: {
-                gameState: stateForPlayer,
-                playerRack: playerRack
-            }
-        };
-        ws.send(JSON.stringify(welcomeEvent));
-        console.log(`Envoyé l'état initial personnalisé pour ${playerId}.\n${JSON.stringify(stateForPlayer)}`);
-
-        /**
-         * Ce bloc est exécuté à chaque fois qu'un message est reçu de ce client spécifique.
-         */
-        ws.on('message', (message) => {
-            try {
-                const event: ClientToServerEvent = JSON.parse(message.toString());
-                // Début de partie
-
-                if (event.type === "START_GAME") {
-                    const currentGame = games.get(gameId)!;
-
-                    // Sécurité : on vérifie que c'est bien l'hôte qui demande le démarrage
-                    const hostId = currentGame.players[0]?.id;
-                    if (playerId !== hostId) {
-                        // Optionnel : renvoyer une erreur au joueur qui n'est pas l'hôte
-                        return;
-                    }
-
-                    // --- LOGIQUE DE DÉMARRAGE ET TIRAGE AU SORT ---
-                    // 1. On mélange la liste des joueurs
-                    const shuffledPlayers = currentGame.players.sort(() => Math.random() - 0.5);
-
-                    // 2. On pioche les tuiles pour chaque joueur
-                    let currentTileBag = currentGame.tileBag;
-                    const playersWithTiles = shuffledPlayers.map(player => {
-                        const { drawnTiles, newBag } = drawTiles(currentTileBag, 7);
-                        currentTileBag = newBag;
-                        return { ...player, rack: drawnTiles };
-                    });
-
-                    // 3. On crée le nouvel état de jeu
-                    const nextGameState: GameState = {
-                        ...currentGame,
-                        players: playersWithTiles,
-                        tileBag: currentTileBag,
-                        status: GameStatus.PLAYING, // La partie commence !
-                        currentPlayerIndex: 0 // Le premier joueur de la liste mélangée commence
-                    };
-
-                    // 4. On sauvegarde et on diffuse le nouvel état à TOUT LE MONDE
-                    games.set(gameId, nextGameState);
-                    broadcastGameState(gameId, nextGameState); // Une fonction qui envoie l'état à tous les joueurs
-                }
-                // Aiguillage des événements reçus du client
-                if (event.type === "PLAY_MOVE") {
-                    const currentGame = games.get(gameId)!;
-                    const { placedTiles } = event.payload;
-
-                    // On délègue TOUTE la logique de traitement du coup au GameEngine.
-                    const nextGameState = processPlayMove(currentGame, placedTiles);
-
-                    if (nextGameState) {
-                        // Si le moteur retourne un nouvel état, le coup était valide.
-                        games.set(gameId, nextGameState); // Mise à jour de l'état maître.
-
-                        // Diffusion (broadcast) de l'état mis à jour à tous les joueurs connectés.
-                        console.log(`✅ Coup validé! Diffusion du nouvel état personnalisé.`);
-                        nextGameState.players.forEach(player => {
-                            const clientWs = gameConnections.get(player.id);
-                            if (clientWs && clientWs.readyState === WebSocket.OPEN) {
-                                const { stateForPlayer, playerRack } = prepareStateForPlayer(nextGameState, player.id);
-                                const updateEvent: ServerToClientEvent = {
-                                    type: "GAME_STATE_UPDATE",
-                                    payload: { gameState: stateForPlayer, playerRack }
-                                };
-                                clientWs.send(JSON.stringify(updateEvent));
-                                console.log(`   - Envoyé état à ${player.id}.`);
-                            }
-                        });
-                    } else {
-                        // Si le moteur retourne null, le coup était invalide.
-                        console.log("❌ Coup invalide! Envoi d'un message d'erreur.");
-                        const errorEvent: ServerToClientEvent = {
-                            type: "ERROR",
-                            payload: { message: "Votre coup est invalide." }
-                        };
-                        ws.send(JSON.stringify(errorEvent));
-                    }
-                }
-                // TODO: Ajouter ici le traitement des autres types d'événements (PASS_TURN, EXCHANGE_TILES...)
-            } catch (error) {
-                console.error("Erreur lors du traitement du message:", error);
-            }
-        });
-
-        /**
-         * Ce bloc est exécuté lorsque le client ferme sa connexion.
-         */
-        ws.on('close', () => {
-            console.log(`👋 Joueur ${playerId} déconnecté.`);
-            gameConnections.delete(playerId); // On le retire de la liste des connexions actives.
-        });
-    });
+            wss.on('connection', (ws, req) => { handleNewConnection(ws, req); });
 }
 
 // On lance le serveur

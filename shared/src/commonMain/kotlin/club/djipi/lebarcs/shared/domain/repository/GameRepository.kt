@@ -10,5 +10,6 @@ interface GameRepository {
     fun getEvents(): Flow<ServerToClientEvent> // Pour écouter les messages
     suspend fun sendPlayMove(placedTiles: List<PlacedTile>)
     suspend fun createGame(creatorId: String): String
+    suspend fun joinGame(gameId: String, playerId: String)
     fun close()
 }

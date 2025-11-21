@@ -78,6 +78,7 @@ export interface FoundWord {
 
 export interface GameState {
     id: string;
+    hostId: string;
     board: Board;
     players: Player[];
     tileBag: Tile[];
