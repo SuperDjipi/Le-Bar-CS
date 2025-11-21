@@ -12,7 +12,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import club.djipi.lebarcs.shared.domain.model.GameStatus
 import club.djipi.lebarcs.ui.screens.game.components.GameContent
+import club.djipi.lebarcs.ui.screens.game.components.EndGameDialog
 import club.djipi.lebarcs.ui.screens.game.components.JokerSelectionDialog
 import club.djipi.lebarcs.ui.screens.game.components.TileView
 import club.djipi.lebarcs.ui.screens.game.dragdrop.ProvideDragDropManager
@@ -44,10 +46,18 @@ fun GameScreen(
     // On observe l'état de l'UI du ViewModel de manière sécurisée par rapport au cycle de vie.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // --- INITIALISATION DU SYSTÈME DE DRAG & DROP ---
-    // ProvideDragDropManager est un Composable qui crée une instance de DragDropManager
-    // et la rend disponible à tous ses enfants via un CompositionLocal.
-    // C'est le "père" de tout notre système de Drag & Drop pour cet écran.
+    // On observe l'état pour afficher le dialogue de fin de partie
+    if (uiState is GameUiState.Playing) {
+        val playingState = uiState as GameUiState.Playing
+
+        if (playingState.gameData.status == GameStatus.FINISHED) {
+            // Affiche le dialogue par-dessus le reste
+            EndGameDialog(
+                players = playingState.gameData.players.sortedByDescending { it.score },
+                onDismiss = onNavigateBack // Quand on ferme le dialogue, on exécute la navigation retour
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -94,7 +104,6 @@ fun GameScreen(
                     )
                 }
             }
-
 
 
             is GameUiState.Error -> {
@@ -169,40 +178,27 @@ private fun GameLayout(
                 val tileSize = 60.dp
                 val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
 
-                // Ce Box prend tout l'écran, ce qui peut poser des problèmes de "vol de clics".
-                // Il est positionné de manière absolue par rapport à la fenêtre.
-//                Box(
-//                    modifier = Modifier
-//                        .fillMaxSize() // Prend tout l'écran
-//                        .offset {
-//                            // On positionne la tuile flottante aux coordonnées du doigt.
-//                            IntOffset(
-//                                x = (state.currentCoordinates.x - tileSizePx / 2).toInt(),
-//                                y = (state.currentCoordinates.y - tileSizePx / 2).toInt()
-//                            )
-//                        }
-//                ) {
-                    // On affiche la tuile en cours de déplacement avec un effet visuel
-                    // (agrandie, transparente, avec une ombre) pour la distinguer.
-                    TileView(
-                        tile = dragState.draggedTile!!,
-                        size = tileSize,
-                        modifier = Modifier
-                            // 1. On positionne la tuile avec offset
-                            .offset {
-                                IntOffset(
-                                    x = (dragState.currentCoordinates.x - tileSizePx / 2).toInt(),
-                                    y = (dragState.currentCoordinates.y - tileSizePx).toInt()
-                                )
-                            }
-                            // 2. On applique les effets visuels
-                            .graphicsLayer {
+                // On affiche la tuile en cours de déplacement avec un effet visuel
+                // (agrandie, transparente, avec une ombre) pour la distinguer.
+                TileView(
+                    tile = dragState.draggedTile!!,
+                    size = tileSize,
+                    modifier = Modifier
+                        // 1. On positionne la tuile avec offset
+                        .offset {
+                            IntOffset(
+                                x = (dragState.currentCoordinates.x - tileSizePx / 2).toInt(),
+                                y = (dragState.currentCoordinates.y - tileSizePx).toInt()
+                            )
+                        }
+                        // 2. On applique les effets visuels
+                        .graphicsLayer {
                             scaleX = 1.3f
                             scaleY = 1.3f
                             shadowElevation = 16f
                             alpha = 0.7f
                         }
-                    )
+                )
                 // du Box}
             }
         }

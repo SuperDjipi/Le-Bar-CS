@@ -7,10 +7,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import club.djipi.lebarcs.ui.screens.game.GameScreen
 import club.djipi.lebarcs.ui.screens.game.GameViewModel
 import club.djipi.lebarcs.ui.screens.home.HomeScreen
@@ -116,7 +118,10 @@ fun NavGraph(
          */
         navigation(
             startDestination = Screen.Lobby.route,
-            route = Screen.GameFlow.route
+            route = Screen.GameFlow.route,
+            arguments = listOf(
+                navArgument("gameId") { type = NavType.StringType },
+                navArgument("playerId") { type = NavType.StringType })
         ) {
             /**
              * Définition de la destination pour l'écran du Lobby.
@@ -141,9 +146,9 @@ fun NavGraph(
 
                 // On informe le ViewModel de l'identité du joueur une seule fois,
                 // grâce au `LaunchedEffect` qui s'exécute lorsque le `playerId` est disponible.
-                LaunchedEffect(playerId) {
+                LaunchedEffect(Unit) {
                     if (gameId.isNotBlank() && playerId.isNotBlank()) {
-                        Log.d("NavGraph", "LaunchedEffect: $gameId, $playerId")
+                        Log.d("NavGraph", "Lobby LaunchedEffect: $gameId, $playerId")
 
                         // 1. D'abord, on identifie le ViewModel.
                         gameViewModel.setLocalPlayerId(playerId)
@@ -182,7 +187,7 @@ fun NavGraph(
                 GameScreen(
                     viewModel = gameViewModel, // On passe le même ViewModel.
                     onNavigateBack = {
-                        navController.popBackStack()
+                        navController.popBackStack(Screen.Home.route, false)
                     }
                 )
             }
