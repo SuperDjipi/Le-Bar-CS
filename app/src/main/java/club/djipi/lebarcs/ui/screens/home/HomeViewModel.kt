@@ -4,7 +4,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import club.djipi.lebarcs.data.local.UserPreferencesRepository
+import club.djipi.lebarcs.shared.domain.model.PlayerGameSummary
 import club.djipi.lebarcs.shared.domain.repository.GameRepository
+import club.djipi.lebarcs.shared.domain.repository.HomeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,7 +50,8 @@ data class HomeUiState(
     val requiresOnboarding: Boolean = false,
     val gameIdInput: String = "",
     val createdGameId: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val activeGames: List<PlayerGameSummary> = emptyList()
 )
 
 /**
@@ -64,6 +67,7 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val gameRepository: GameRepository,
+    private val homeRepository: HomeRepository,
     private val httpClient: HttpClient
 ) : ViewModel() {
 
@@ -109,10 +113,34 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }
+            // 3. Si le joueur est reconnu, on charge immédiatement ses parties actives.
+            if (localPlayerId != null) {
+                loadActiveGames(localPlayerId)
+            }
             Log.d("HomeViewModel", "Chargement initial terminé. PlayerID: $localPlayerId, PlayerName: $playerName")
         }
     }
 
+    /**
+     * Charge la liste des parties actives pour le joueur local en appelant le HomeRepository.
+     */
+    private fun loadActiveGames(playerId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) } // On peut montrer un loader pour cette action aussi
+            try {
+                // On délègue l'appel réseau au repository spécialisé.
+                val games = homeRepository.getMyActiveGames(playerId)
+
+                // On met à jour l'état de l'UI avec la liste des parties reçues.
+                _uiState.update { it.copy(isLoading = false, activeGames = games) }
+                Log.d("HomeViewModel", "${games.size} partie(s) active(s) chargée(s).")
+
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Erreur lors du chargement des parties actives", e)
+                _uiState.update { it.copy(isLoading = false, error = "Impossible de charger vos parties.") }
+            }
+        }
+    }
     /**
      * Lance la création d'une nouvelle partie en appelant le `GameRepository`.
      */
@@ -231,5 +259,10 @@ class HomeViewModel @Inject constructor(
     fun resetNavigation() {
         _uiState.update { it.copy(createdGameId = null) }
     }
-}
 
+    /**     * Appelé lorsque l'utilisateur clique sur une partie existante dans la liste.
+     */
+    fun onGameSelected(gameId: String) {
+        _uiState.update { it.copy(createdGameId = gameId) }
+    }
+}

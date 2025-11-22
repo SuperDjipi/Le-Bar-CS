@@ -2,7 +2,9 @@ package club.djipi.lebarcs.di
 
 import club.djipi.lebarcs.data.remote.WebSocketClient
 import club.djipi.lebarcs.data.repository.GameRepositoryImpl
+import club.djipi.lebarcs.data.repository.HomeRepositoryImpl
 import club.djipi.lebarcs.shared.domain.repository.GameRepository
+import club.djipi.lebarcs.shared.domain.repository.HomeRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,5 +27,14 @@ object RepositoryModule {
         httpClient: HttpClient
     ): GameRepository {
         return GameRepositoryImpl(webSocketClient, externalScope, httpClient)
+    }
+
+    @Provides
+    @Singleton
+    fun provideHomeRepository(
+        // Hilt sait comment fournir le HttpClient grâce au NetworkModule
+        httpClient: HttpClient
+    ): HomeRepository {
+        return HomeRepositoryImpl(httpClient)
     }
 }
