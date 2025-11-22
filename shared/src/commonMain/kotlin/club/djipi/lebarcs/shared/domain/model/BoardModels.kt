@@ -103,7 +103,8 @@ value class Board(
                 (row == 7) && (col == 0 || col == 14) -> BonusType.TRIPLE_WORD
 
                 // Mot compte double
-                (row == col || row + col == 14) && row in 1..13 -> BonusType.DOUBLE_WORD
+                (row == col || row + col == 14) && row in 1..4 -> BonusType.DOUBLE_WORD
+                (row == col || row + col == 14) && row in 10..13 -> BonusType.DOUBLE_WORD
 
                 // Lettre compte triple
                 (row == 1 || row == 13) && (col == 5 || col == 9) -> BonusType.TRIPLE_LETTER

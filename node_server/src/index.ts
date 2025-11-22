@@ -190,6 +190,36 @@ async function startServer() {
     });
     // --- FIN DE L'API D'INSCRIPTION ---
 
+/**
+ * Route API pour récupérer la liste des parties en cours pour un joueur spécifique.
+ */
+app.get('/api/players/:playerId/games', (req, res) => {
+    const { playerId } = req.params;
+
+    if (!playerId) {
+        return res.status(400).send({ message: "L'ID du joueur est requis." });
+    }
+
+    // On parcourt toutes les parties en mémoire.
+    const activeGamesForPlayer = Array.from(games.values())
+        .filter(game => game.players.some(p => p.id === playerId)) // On ne garde que les parties où le joueur est présent
+        .filter(game => game.status !== GameStatus.FINISHED) // On exclut les parties terminées
+        .map(game => {
+            // On ne renvoie que les informations publiques, jamais les chevalets ou la pioche.
+            return {
+                gameId: game.id,
+                players: game.players.map(p => p.name),
+                currentPlayerId: game.players[game.currentPlayerIndex]?.id,
+                status: game.status,
+                turnNumber: game.turnNumber
+            };
+        });
+
+    console.log(`🔎 Requête pour les parties de ${playerId}. ${activeGamesForPlayer.length} partie(s) trouvée(s).`);
+
+    res.status(200).json(activeGamesForPlayer);
+});
+
     /**
      * Route API pour permettre à un joueur de rejoindre une partie existante.
      * Attend une requête POST sur /api/games/:gameId/join

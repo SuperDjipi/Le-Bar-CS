@@ -77,6 +77,19 @@ class GameRepositoryImpl @Inject constructor(
         webSocketClient.sendEvent(playMoveEvent)
     }
 
+    override suspend fun sendPassTurn() {
+        webSocketClient.sendEvent(ClientToServerEvent.PassTurn)
+    }
+
+    /**
+     * Implémente l'envoi de l'événement pour démarrer la partie.
+     */
+    override suspend fun sendStartGame() {
+        // C'est très simple : on envoie l'objet 'StartGame' défini
+        // dans notre sealed class ClientToServerEvent.
+        webSocketClient.sendEvent(ClientToServerEvent.StartGame)
+    }
+
     override suspend fun createGame(creatorId: String): String {
         try {
             // On fait un appel POST à notre API serveur

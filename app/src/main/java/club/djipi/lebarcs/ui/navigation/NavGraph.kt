@@ -187,7 +187,17 @@ fun NavGraph(
                 GameScreen(
                     viewModel = gameViewModel, // On passe le même ViewModel.
                     onNavigateBack = {
-                        navController.popBackStack(Screen.Home.route, false)
+                        // Au lieu de simplement "poper", on navigue explicitement vers l'accueil
+                        // en nettoyant tout derrière nous.
+                        navController.navigate(Screen.Home.route) {
+                            // On retire de la pile TOUS les écrans jusqu'au début du graphe de navigation.
+                            popUpTo(navController.graph.startDestinationId) {
+                                inclusive =
+                                    true // On inclut la destination de départ (le HomeScreen initial) pour le retirer aussi.
+                            }
+                            // On s'assure qu'on ne crée pas de multiples instances du HomeScreen en haut de la pile.
+                            launchSingleTop = true
+                        }
                     }
                 )
             }

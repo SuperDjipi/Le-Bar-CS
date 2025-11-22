@@ -154,6 +154,15 @@ fun GameContent(
                 Icon(Icons.Default.ArrowDropDown, "Annuler")
             }
 
+//            // Bouton Echanger
+//            OutlinedButton(
+//                onClick = onPass,
+//                modifier = Modifier.weight(1f)
+//            ) {
+//                //Text("Echanger")
+//                Icon(Icons.Default.Close, "Passer")
+//            }
+
             // Bouton Passer
             OutlinedButton(
                 onClick = onPass,

@@ -54,7 +54,7 @@ fun GameScreen(
             // Affiche le dialogue par-dessus le reste
             EndGameDialog(
                 players = playingState.gameData.players.sortedByDescending { it.score },
-                onDismiss = onNavigateBack // Quand on ferme le dialogue, on exécute la navigation retour
+                onDismiss = onNavigateBack
             )
         }
     }
@@ -93,16 +93,6 @@ fun GameScreen(
                     viewModel = viewModel,
                     modifier = Modifier.padding(paddingValues)
                 )
-                if (state.jokerSelectionState != null) {
-                    JokerSelectionDialog(
-                        onLetterSelected = { letter ->
-                            viewModel.onJokerLetterSelected(letter)
-                        },
-                        onDismiss = {
-//                        viewModel.onJokerSelectionDismissed()
-                        }
-                    )
-                }
             }
 
 
@@ -161,7 +151,7 @@ private fun GameLayout(
                 onTileReturnedToRack = viewModel::onTileReturnedToRack,
                 onRackTilesReordered = viewModel::onRackTilesReordered,
                 onPlayMove = viewModel::onPlayMove,
-                onPass = viewModel::onPass,
+                onPass = viewModel::onPassTurn,
                 onUndoMove = viewModel::onUndoMove,
                 onShuffleRack = viewModel::onShuffleRack,
                 getValidDropBoardPositions = viewModel::getValidDropPositions,
@@ -200,6 +190,19 @@ private fun GameLayout(
                         }
                 )
                 // du Box}
+            }
+
+            // 3. Le dialogue du joker, s'il est nécessaire, est affiché par-dessus tout le reste.
+            if (state.jokerSelectionState != null) {
+                JokerSelectionDialog(
+                    onLetterSelected = { letter ->
+                        // On appelle la fonction du ViewModel, comme prévu.
+                        viewModel.onJokerLetterSelected(letter)
+                    },
+                    onDismiss = {
+                        //viewModel.onJokerSelectionDismissed() // N'oubliez pas cette fonction
+                    }
+                )
             }
         }
     }
